@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breeder Farm & Hatchery — Daily Checklist</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --danger:#a33b2b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:.2px;
+  }
+  header p{
+    margin:4px 0 0;
+    font-size:12.5px;
+    opacity:.85;
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:110px;}
+  label{
+    display:block;
+    font-size:11.5px;
+    color:#5a5a4f;
+    margin-bottom:3px;
+    font-weight:600;
+  }
+  input, select{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus, select:focus{
+    outline:2px solid var(--green);
+    outline-offset:1px;
+  }
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+  }
+  table.grid th{
+    background:#eef1e8;
+    color:var(--green-dark);
+    padding:5px 4px;
+    font-size:10.5px;
+    text-align:center;
+    border:1px solid var(--line);
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:3px;
+    text-align:center;
+  }
+  table.grid td input{
+    padding:5px 3px;
+    font-size:12.5px;
+    text-align:center;
+    min-width:44px;
+  }
+  table.grid td.rowlabel{
+    text-align:left;
+    font-weight:600;
+    font-size:11.5px;
+    padding-left:6px;
+    white-space:nowrap;
+  }
+  .scroll-x{overflow-x:auto;padding-bottom:4px;}
+  .status-btns{display:flex;gap:4px;justify-content:center;}
+  .status-btns button{
+    border:1px solid var(--line);
+    background:#fff;
+    padding:4px 6px;
+    font-size:10px;
+    border-radius:5px;
+  }
+  .status-btns button.active-ok{background:var(--green);color:#fff;border-color:var(--green);}
+  .status-btns button.active-bad{background:var(--danger);color:#fff;border-color:var(--danger);}
+  .add-row{
+    margin-top:8px;
+    background:none;
+    border:1px dashed var(--green);
+    color:var(--green-dark);
+    padding:6px 10px;
+    border-radius:6px;
+    font-size:12px;
+    font-weight:600;
+  }
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{
+    flex:1;
+    padding:13px;
+    border-radius:8px;
+    border:none;
+    font-size:14.5px;
+    font-weight:700;
+  }
+  .btn-primary{background:var(--amber);color:#fff;}
+  .btn-secondary{background:var(--green-dark);color:#fff;}
+  .hint{font-size:11px;color:#7a7a6d;margin-top:4px;}
+  .save-flag{
+    font-size:11.5px;
+    color:var(--green-dark);
+    text-align:center;
+    padding:6px;
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Daily Operation Checklist</h1>
+  <p>Breeder Farm & Hatchery — CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Shift Details</h2>
+    <div class="row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label>Shift</label>
+        <select id="f-shift">
+          <option>Day</option>
+          <option>Night</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Team Leader</label>
+        <input type="text" id="f-leader" placeholder="e.g. Robert. W">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Setter & Incubator Monitoring</h2>
+    <div class="scroll-x">
+      <table class="grid" id="setter-table">
+        <thead>
+          <tr>
+            <th rowspan="2">Item</th>
+            <th colspan="2">Temp (°C)</th>
+            <th colspan="2">Humidity (%)</th>
+            <th colspan="2">Egg Temp (°C)</th>
+            <th rowspan="2">Remarks</th>
+          </tr>
+          <tr>
+            <th>AM</th><th>PM</th><th>AM</th><th>PM</th><th>AM</th><th>PM</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Fan & Ventilation Check</h2>
+    <div class="scroll-x">
+      <table class="grid" id="fan-table">
+        <thead>
+          <tr><th>Item</th><th>Status</th><th>OK / Faulty</th><th>Remarks</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Poultry House Environment</h2>
+    <div class="scroll-x">
+      <table class="grid" id="house-table">
+        <thead>
+          <tr><th>House</th><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>OK</th><th>Remarks</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="add-row" onclick="addHouseRow()">+ Add reading</button>
+  </div>
+
+  <div class="card">
+    <h2>Feeding & Watering Record</h2>
+    <div class="scroll-x">
+      <table class="grid" id="feed-table">
+        <thead>
+          <tr>
+            <th rowspan="2">House</th><th rowspan="2">Feed Type</th>
+            <th colspan="3">Feed (kg)</th>
+            <th colspan="2">Water Reading</th>
+            <th rowspan="2">Remarks</th>
+          </tr>
+          <tr><th>Male</th><th>Female</th><th>Total</th><th>AM</th><th>PM</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="add-row" onclick="addFeedRow()">+ Add house</button>
+  </div>
+
+  <div class="card">
+    <h2>Vaccination & Mortality</h2>
+    <div class="scroll-x">
+      <table class="grid" id="vacc-table">
+        <thead>
+          <tr><th>House</th><th>Vaccine</th><th>Mortality</th><th>Gender</th><th>Post-Mortem Finding</th><th>Action</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="add-row" onclick="addVaccRow()">+ Add entry</button>
+  </div>
+
+  <div class="card">
+    <h2>Egg Collection Records</h2>
+    <div class="row">
+      <div class="field"><label>9:00 AM</label><input type="number" id="egg-9am"></div>
+      <div class="field"><label>12:00 PM</label><input type="number" id="egg-12pm"></div>
+      <div class="field"><label>4:00 PM</label><input type="number" id="egg-4pm"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Total Table Eggs</label><input type="number" id="egg-table"></div>
+      <div class="field"><label>Total Hatchery Eggs</label><input type="number" id="egg-hatchery"></div>
+      <div class="field"><label>Total Eggs (auto)</label><input type="number" id="egg-total" readonly style="background:#f0efe8;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sign Off</h2>
+    <div class="row">
+      <div class="field"><label>Team Leader Signature (type name)</label><input type="text" id="sig-leader"></div>
+      <div class="field"><label>Manager Review (type name)</label><input type="text" id="sig-manager"></div>
+    </div>
+  </div>
+
+  <p class="hint">Fill in only the fields you have data for — blanks stay blank on the PDF, just like the paper form.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const setterItems = ["Setter 1","Setter 2","Setter 3","Setter 4","Hatcher 1","Hatcher 2","Hatcher 3"];
+const fanItems = ["Fan 1","Fan 2","Fan 3","Fan 4","Outer Fan 1","Outer Fan 2","Outer Fan 3"];
+
+function buildSetterTable(){
+  const tbody = document.querySelector("#setter-table tbody");
+  setterItems.forEach((name,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="rowlabel">${name}</td>
+      <td><input data-k="tempAM" data-i="${i}"></td>
+      <td><input data-k="tempPM" data-i="${i}"></td>
+      <td><input data-k="humAM" data-i="${i}"></td>
+      <td><input data-k="humPM" data-i="${i}"></td>
+      <td><input data-k="eggAM" data-i="${i}"></td>
+      <td><input data-k="eggPM" data-i="${i}"></td>
+      <td><input data-k="remarks" data-i="${i}" style="min-width:70px;"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildFanTable(){
+  const tbody = document.querySelector("#fan-table tbody");
+  fanItems.forEach((name,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="rowlabel">${name}</td>
+      <td>
+        <select data-fan-status="${i}">
+          <option value="">-</option>
+          <option value="ON">ON</option>
+          <option value="OFF">OFF</option>
+        </select>
+      </td>
+      <td>
+        <select data-fan-ok="${i}">
+          <option value="">-</option>
+          <option value="OK">OK</option>
+          <option value="Faulty">Faulty</option>
+        </select>
+      </td>
+      <td><input data-fan-remarks="${i}" style="min-width:70px;"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+let houseRowCount = 0;
+function addHouseRow(){
+  const tbody = document.querySelector("#house-table tbody");
+  const i = houseRowCount++;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input data-house="${i}" placeholder="COBB 1" style="min-width:56px;"></td>
+    <td><input data-house-time="${i}" placeholder="Morning" style="min-width:56px;"></td>
+    <td><input data-house-temp="${i}" style="min-width:50px;"></td>
+    <td><input data-house-hum="${i}" style="min-width:50px;"></td>
+    <td>
+      <select data-house-ok="${i}">
+        <option value="">-</option>
+        <option value="OK">OK</option>
+        <option value="Not OK">Not OK</option>
+      </select>
+    </td>
+    <td><input data-house-remarks="${i}" style="min-width:64px;"></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+let feedRowCount = 0;
+function addFeedRow(){
+  const tbody = document.querySelector("#feed-table tbody");
+  const i = feedRowCount++;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input data-feed-house="${i}" placeholder="COBB 1" style="min-width:56px;"></td>
+    <td><input data-feed-type="${i}" placeholder="Breeder Layer" style="min-width:70px;"></td>
+    <td><input data-feed-male="${i}" style="min-width:48px;"></td>
+    <td><input data-feed-female="${i}" style="min-width:48px;"></td>
+    <td><input data-feed-total="${i}" style="min-width:48px;"></td>
+    <td><input data-feed-waterAM="${i}" style="min-width:56px;"></td>
+    <td><input data-feed-waterPM="${i}" style="min-width:56px;"></td>
+    <td><input data-feed-remarks="${i}" style="min-width:64px;"></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+let vaccRowCount = 0;
+function addVaccRow(){
+  const tbody = document.querySelector("#vacc-table tbody");
+  const i = vaccRowCount++;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input data-vacc-house="${i}" placeholder="COBB 1" style="min-width:56px;"></td>
+    <td><input data-vacc-vaccine="${i}" style="min-width:56px;"></td>
+    <td><input data-vacc-mortality="${i}" style="min-width:40px;"></td>
+    <td>
+      <select data-vacc-gender="${i}">
+        <option value="">-</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+    </td>
+    <td><input data-vacc-finding="${i}" style="min-width:80px;"></td>
+    <td><input data-vacc-action="${i}" style="min-width:64px;"></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function autoTotalEggs(){
+  const am = parseFloat(document.getElementById("egg-9am").value) || 0;
+  const noon = parseFloat(document.getElementById("egg-12pm").value) || 0;
+  const pm = parseFloat(document.getElementById("egg-4pm").value) || 0;
+  document.getElementById("egg-total").value = (am+noon+pm) || "";
+}
+["egg-9am","egg-12pm","egg-4pm"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", autoTotalEggs);
+});
+
+buildSetterTable();
+buildFanTable();
+addHouseRow();
+addFeedRow();
+addVaccRow();
+
+function val(sel){ const e = document.querySelector(sel); return e ? e.value : ""; }
+
+function collectData(){
+  const data = { setter:[], fan:[], house:[], feed:[], vacc:[] };
+
+  setterItems.forEach((name,i)=>{
+    data.setter.push({
+      name,
+      tempAM: val(`[data-k="tempAM"][data-i="${i}"]`),
+      tempPM: val(`[data-k="tempPM"][data-i="${i}"]`),
+      humAM: val(`[data-k="humAM"][data-i="${i}"]`),
+      humPM: val(`[data-k="humPM"][data-i="${i}"]`),
+      eggAM: val(`[data-k="eggAM"][data-i="${i}"]`),
+      eggPM: val(`[data-k="eggPM"][data-i="${i}"]`),
+      remarks: val(`[data-k="remarks"][data-i="${i}"]`),
+    });
+  });
+
+  fanItems.forEach((name,i)=>{
+    data.fan.push({
+      name,
+      status: val(`[data-fan-status="${i}"]`),
+      ok: val(`[data-fan-ok="${i}"]`),
+      remarks: val(`[data-fan-remarks="${i}"]`),
+    });
+  });
+
+  for(let i=0;i<houseRowCount;i++){
+    const house = val(`[data-house="${i}"]`);
+    if(!house && !val(`[data-house-temp="${i}"]`) && !val(`[data-house-hum="${i}"]`)) continue;
+    data.house.push({
+      house,
+      time: val(`[data-house-time="${i}"]`),
+      temp: val(`[data-house-temp="${i}"]`),
+      hum: val(`[data-house-hum="${i}"]`),
+      ok: val(`[data-house-ok="${i}"]`),
+      remarks: val(`[data-house-remarks="${i}"]`),
+    });
+  }
+
+  for(let i=0;i<feedRowCount;i++){
+    const house = val(`[data-feed-house="${i}"]`);
+    if(!house) continue;
+    data.feed.push({
+      house,
+      type: val(`[data-feed-type="${i}"]`),
+      male: val(`[data-feed-male="${i}"]`),
+      female: val(`[data-feed-female="${i}"]`),
+      total: val(`[data-feed-total="${i}"]`),
+      waterAM: val(`[data-feed-waterAM="${i}"]`),
+      waterPM: val(`[data-feed-waterPM="${i}"]`),
+      remarks: val(`[data-feed-remarks="${i}"]`),
+    });
+  }
+
+  for(let i=0;i<vaccRowCount;i++){
+    const house = val(`[data-vacc-house="${i}"]`);
+    if(!house) continue;
+    data.vacc.push({
+      house,
+      vaccine: val(`[data-vacc-vaccine="${i}"]`),
+      mortality: val(`[data-vacc-mortality="${i}"]`),
+      gender: val(`[data-vacc-gender="${i}"]`),
+      finding: val(`[data-vacc-finding="${i}"]`),
+      action: val(`[data-vacc-action="${i}"]`),
+    });
+  }
+
+  data.date = document.getElementById("f-date").value;
+  data.shift = document.getElementById("f-shift").value;
+  data.leader = document.getElementById("f-leader").value;
+  data.egg9 = document.getElementById("egg-9am").value;
+  data.egg12 = document.getElementById("egg-12pm").value;
+  data.egg4 = document.getElementById("egg-4pm").value;
+  data.eggTable = document.getElementById("egg-table").value;
+  data.eggHatchery = document.getElementById("egg-hatchery").value;
+  data.eggTotal = document.getElementById("egg-total").value;
+  data.sigLeader = document.getElementById("sig-leader").value;
+  data.sigManager = document.getElementById("sig-manager").value;
+
+  return data;
+}
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function generatePDF(){
+  const d = collectData();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const marginL = 30;
+  let pageW = doc.internal.pageSize.getWidth();
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.text("DAILY OPERATION CHECKLIST - BREEDER FARM & HATCHERY", pageW/2, 32, {align:"center"});
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Date: ${fmtDate(d.date)}`, marginL, 48);
+  doc.text(`Shift: ${d.shift}`, marginL+150, 48);
+  doc.text(`Team Leader: ${d.leader}`, marginL+280, 48);
+
+  let y = 58;
+
+  // Setter & Incubator table
+  doc.autoTable({
+    startY: y,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:7.5, cellPadding:2, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[
+      [{content:"Item",rowSpan:2},{content:"Temp (°C)",colSpan:2},{content:"Humidity (%)",colSpan:2},{content:"Egg Temp (°C)",colSpan:2},{content:"Remarks",rowSpan:2}],
+      ["Morning","Evening","Morning","Evening","Morning","Evening"]
+    ],
+    body: d.setter.map(r=>[r.name, r.tempAM, r.tempPM, r.humAM, r.humPM, r.eggAM, r.eggPM, r.remarks]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 7:{halign:"left"}},
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(10);
+  doc.text("Fan & Ventilation Check", marginL, y);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["Item","Fan Status","OK / Faulty","Remarks"]],
+    body: d.fan.map(r=>[r.name, r.status, r.ok, r.remarks]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 3:{halign:"left"}},
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  doc.setFont("helvetica","bold");
+  doc.text("Poultry House Environment", marginL, y);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["House No","Time","Temp (°C)","Humidity (%)","OK / Not OK","Remarks"]],
+    body: d.house.map(r=>[r.house, r.time, r.temp, r.hum, r.ok, r.remarks]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 5:{halign:"left"}},
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  // Check remaining space before next block; if tight, move to new page
+  if(y > 650){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.text("Feeding & Watering Record", marginL, y);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[
+      [{content:"House",rowSpan:2},{content:"Feed Type",rowSpan:2},{content:"Feed (kg)",colSpan:3},{content:"Water Reading",colSpan:2},{content:"Remarks",rowSpan:2}],
+      ["Male","Female","Total","Morning","Afternoon"]
+    ],
+    body: d.feed.map(r=>[r.house, r.type, r.male, r.female, r.total, r.waterAM, r.waterPM, r.remarks]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 1:{halign:"left"}, 7:{halign:"left"}},
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  if(y > 650){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.text("Vaccination & Mortality", marginL, y);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["House","Vaccine","Mortality","Gender","Post-Mortem Finding","Action"]],
+    body: d.vacc.map(r=>[r.house, r.vaccine, r.mortality, r.gender, r.finding, r.action]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 4:{halign:"left"}, 5:{halign:"left"}},
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  if(y > 680){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.text("Egg Collection Records", marginL, y);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["9:00am","12:00pm","4:00pm","Total Eggs","Table Eggs","Hatchery Eggs"]],
+    body: [[d.egg9, d.egg12, d.egg4, d.eggTotal, d.eggTable, d.eggHatchery]],
+  });
+  y = doc.lastAutoTable.finalY + 30;
+
+  if(y > 760){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Team Leader Signature: ${d.sigLeader || "________________________"}`, marginL, y);
+  doc.text(`Manager Review: ${d.sigManager || "________________________"}`, marginL+280, y);
+
+  const fname = `Daily_OPS_Checklist_${d.date || "draft"}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.querySelectorAll("input").forEach(i=>i.value="");
+  document.querySelectorAll("select").forEach(s=>s.value="");
+}
+</script>
+</body>
+</html>

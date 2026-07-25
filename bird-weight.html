@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bird Weight Record</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --male:#3b5a80;
+    --female:#a3486b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{max-width:720px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:110px;}
+  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  input, select{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  .weight-grid{
+    display:grid;
+    grid-template-columns:28px 1fr;
+    gap:6px 8px;
+    align-items:center;
+  }
+  .weight-grid .num{
+    font-size:12px;
+    color:#7a7a6d;
+    text-align:right;
+  }
+  .weight-grid input{ padding:7px 8px; font-size:14px; }
+  .weight-grid input.male-input{ border-left:3px solid var(--male); }
+  .weight-grid input.female-input{ border-left:3px solid var(--female); }
+
+  .add-row{
+    margin-top:10px;
+    background:none;
+    border:1px dashed var(--green);
+    color:var(--green-dark);
+    padding:7px 12px;
+    border-radius:6px;
+    font-size:12.5px;
+    font-weight:600;
+    width:100%;
+  }
+  .remove-row{
+    background:none;
+    border:none;
+    color:#a33b2b;
+    font-size:16px;
+    padding:0 4px;
+  }
+  .stat-line{
+    display:flex;
+    justify-content:space-between;
+    font-size:12.5px;
+    color:#5a5a4f;
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px solid var(--line);
+  }
+  .stat-line b{ color:var(--ink); }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+
+  .entry-row{ display:contents; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bird Weight Record</h1>
+  <p>Breeder Farm — CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Record Details</h2>
+    <div class="row">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>House</label><input type="text" id="f-house" placeholder="COBB 1"></div>
+      <div class="field"><label>Flock Age (weeks)</label><input type="number" id="f-age"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Male Weights (kg)</h2>
+    <div class="weight-grid" id="male-grid"></div>
+    <button class="add-row" onclick="addWeight('male')">+ Add male bird</button>
+    <div class="stat-line">
+      <span>Count: <b id="male-count">0</b></span>
+      <span>Average: <b id="male-avg">0.00</b> kg</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Female Weights (kg)</h2>
+    <div class="weight-grid" id="female-grid"></div>
+    <button class="add-row" onclick="addWeight('female')">+ Add female bird</button>
+    <div class="stat-line">
+      <span>Count: <b id="female-count">0</b></span>
+      <span>Average: <b id="female-avg">0.00</b> kg</span>
+    </div>
+  </div>
+
+  <p class="hint">Tap "+ Add" to add each bird as you weigh it. Leave any box blank to skip it — averages update automatically.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+let maleCount = 0;
+let femaleCount = 0;
+
+function addWeight(sex){
+  const grid = document.getElementById(sex + "-grid");
+  const idx = sex === "male" ? ++maleCount : ++femaleCount;
+  const num = document.createElement("div");
+  num.className = "num";
+  num.textContent = idx + ".";
+  num.dataset.role = sex + "-label";
+
+  const inputWrap = document.createElement("div");
+  inputWrap.style.display = "flex";
+  inputWrap.style.gap = "4px";
+
+  const input = document.createElement("input");
+  input.type = "number";
+  input.step = "0.01";
+  input.className = sex + "-input";
+  input.dataset.role = sex + "-weight";
+  input.addEventListener("input", ()=>updateStats(sex));
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "remove-row";
+  removeBtn.textContent = "✕";
+  removeBtn.onclick = ()=>{
+    num.remove();
+    inputWrap.remove();
+    updateStats(sex);
+    renumber(sex);
+  };
+
+  inputWrap.appendChild(input);
+  inputWrap.appendChild(removeBtn);
+  grid.appendChild(num);
+  grid.appendChild(inputWrap);
+}
+
+function renumber(sex){
+  const grid = document.getElementById(sex + "-grid");
+  const labels = grid.querySelectorAll(`[data-role="${sex}-label"]`);
+  labels.forEach((el,i)=>{ el.textContent = (i+1) + "."; });
+}
+
+function updateStats(sex){
+  const grid = document.getElementById(sex + "-grid");
+  const inputs = grid.querySelectorAll(`[data-role="${sex}-weight"]`);
+  const values = [];
+  inputs.forEach(i=>{ if(i.value !== "") values.push(parseFloat(i.value)); });
+  const count = values.length;
+  const avg = count ? (values.reduce((a,b)=>a+b,0)/count) : 0;
+  document.getElementById(sex + "-count").textContent = count;
+  document.getElementById(sex + "-avg").textContent = avg.toFixed(2);
+}
+
+// start with 5 rows each to reduce initial taps
+for(let i=0;i<5;i++){ addWeight("male"); addWeight("female"); }
+
+function getWeights(sex){
+  const grid = document.getElementById(sex + "-grid");
+  const inputs = grid.querySelectorAll(`[data-role="${sex}-weight"]`);
+  const values = [];
+  inputs.forEach(i=>{ if(i.value !== "") values.push(parseFloat(i.value)); });
+  return values;
+}
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function generatePDF(){
+  const date = document.getElementById("f-date").value;
+  const house = document.getElementById("f-house").value;
+  const age = document.getElementById("f-age").value;
+
+  const male = getWeights("male");
+  const female = getWeights("female");
+  const maleAvg = male.length ? (male.reduce((a,b)=>a+b,0)/male.length) : 0;
+  const femaleAvg = female.length ? (female.reduce((a,b)=>a+b,0)/female.length) : 0;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 34;
+  const marginR = 34;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(14);
+  doc.text("BIRD WEIGHT RECORD", pageW/2, 34, {align:"center"});
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  let infoY = 52;
+  const infoParts = [];
+  if(date) infoParts.push(`Date: ${fmtDate(date)}`);
+  if(house) infoParts.push(`House: ${house}`);
+  if(age) infoParts.push(`Flock Age: ${age} wks`);
+  doc.text(infoParts.join("      "), marginL, infoY);
+
+  // Build columns of 25 entries each: Male first, then Female (continuing across as many columns as needed)
+  const perCol = 25;
+  const maleCols = Math.max(1, Math.ceil(male.length / perCol) || 1);
+  const femaleCols = Math.max(1, Math.ceil(female.length / perCol) || 1);
+  const totalCols = maleCols + femaleCols;
+
+  const headers = [];
+  for(let c=0;c<maleCols;c++){ headers.push(c===0 ? "Male (kg)" : "Male (kg) cont."); }
+  for(let c=0;c<femaleCols;c++){ headers.push(c===0 ? "Female (kg)" : "Female (kg) cont."); }
+
+  const maxRows = perCol;
+  const body = [];
+  for(let r=0;r<maxRows;r++){
+    const row = [];
+    for(let c=0;c<maleCols;c++){
+      const idx = c*perCol + r;
+      row.push(idx < male.length ? `${idx+1}. ${male[idx].toFixed(2)}` : "");
+    }
+    for(let c=0;c<femaleCols;c++){
+      const idx = c*perCol + r;
+      row.push(idx < female.length ? `${idx+1}. ${female[idx].toFixed(2)}` : "");
+    }
+    body.push(row);
+  }
+
+  doc.autoTable({
+    startY: infoY + 14,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:9, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[headers],
+    body: body,
+    theme:"grid",
+  });
+
+  let y = doc.lastAutoTable.finalY + 20;
+  if(y > 760){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(10);
+  doc.text(`Male Average: ${maleAvg.toFixed(2)} kg`, marginL, y);
+  doc.text(`Female Average: ${femaleAvg.toFixed(2)} kg`, marginL + 220, y);
+  y += 16;
+  doc.text(`Male Bird Count: ${male.length}`, marginL, y);
+  doc.text(`Female Bird Count: ${female.length}`, marginL + 220, y);
+
+  const fname = `Bird_Average_Weight_${date || "draft"}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered weights?")) return;
+  document.getElementById("male-grid").innerHTML = "";
+  document.getElementById("female-grid").innerHTML = "";
+  maleCount = 0; femaleCount = 0;
+  for(let i=0;i<5;i++){ addWeight("male"); addWeight("female"); }
+  document.getElementById("f-date").value = "";
+  document.getElementById("f-house").value = "";
+  document.getElementById("f-age").value = "";
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor Checklist</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{max-width:900px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:130px;}
+  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+  }
+  table.grid th{
+    background:#eef1e8;
+    color:var(--green-dark);
+    padding:6px 4px;
+    font-size:10.5px;
+    text-align:center;
+    border:1px solid var(--line);
+    white-space:nowrap;
+    position:sticky;
+    top:0;
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:3px;
+    text-align:center;
+  }
+  table.grid td.date-cell{
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+    white-space:nowrap;
+    font-size:11px;
+  }
+  table.grid input{
+    padding:6px 4px;
+    font-size:12.5px;
+    text-align:center;
+    min-width:70px;
+  }
+  .scroll-x{ overflow-x:auto; }
+  .scroll-y{ max-height:56vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; }
+
+  .grand-total{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+    padding-top:10px;
+    border-top:2px solid var(--green);
+    font-size:14px;
+    font-weight:700;
+  }
+  .grand-total span.value{ color:var(--amber); font-size:17px; }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Monitor Checklist</h1>
+  <p>CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Details</h2>
+    <div class="row">
+      <div class="field"><label>Month</label><input type="month" id="f-month"></div>
+      <div class="field"><label>Staff Name</label><input type="text" id="f-staff"></div>
+      <div class="field"><label>Position</label><input type="text" id="f-position"></div>
+    </div>
+    <button class="btn-secondary" style="width:100%;padding:10px;border:none;border-radius:6px;font-weight:700;" onclick="buildMonthTable()">Build Days For This Month</button>
+  </div>
+
+  <div class="card" id="table-card" style="display:none;">
+    <h2 id="table-title">Daily Log</h2>
+    <div class="scroll-y">
+      <div class="scroll-x">
+        <table class="grid" id="monitor-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Multi-Vitamins (Name)</th>
+              <th>Type of Medicine</th>
+              <th>Quantity (Units/Sachets)</th>
+              <th>Liters (L)</th>
+              <th>Grams (g)</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grand-total">
+      <span>Monthly Total — Quantity</span>
+      <span class="value" id="total-qty">0</span>
+    </div>
+    <div class="grand-total">
+      <span>Monthly Total — Liters (L)</span>
+      <span class="value" id="total-liters">0</span>
+    </div>
+    <div class="grand-total">
+      <span>Monthly Total — Grams (g)</span>
+      <span class="value" id="total-grams">0</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sign Off</h2>
+    <div class="row">
+      <div class="field"><label>Staff Signature (type name)</label><input type="text" id="f-sig"></div>
+      <div class="field"><label>Date Submitted</label><input type="date" id="f-submitted"></div>
+    </div>
+  </div>
+
+  <p class="hint">Pick a month, tap "Build Days For This Month" to lay out every date automatically, then fill in only the days you have data for.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+let dayCount = 0;
+
+function buildMonthTable(){
+  const monthVal = document.getElementById("f-month").value; // format YYYY-MM
+  if(!monthVal){ alert("Pick a month first."); return; }
+  const [year, month] = monthVal.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const tbody = document.querySelector("#monitor-table tbody");
+  tbody.innerHTML = "";
+  dayCount = daysInMonth;
+
+  for(let d=1; d<=daysInMonth; d++){
+    const dateLabel = `${String(d).padStart(2,"0")} ${MONTH_ABBR[month-1]} ${year}`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="date-cell">${dateLabel}</td>
+      <td><input type="text" data-row="${d}" data-k="vitamin" style="min-width:90px;"></td>
+      <td><input type="text" data-row="${d}" data-k="medicine" style="min-width:90px;"></td>
+      <td><input type="number" data-row="${d}" data-k="qty" oninput="updateTotals()"></td>
+      <td><input type="number" step="0.01" data-row="${d}" data-k="liters" oninput="updateTotals()"></td>
+      <td><input type="number" step="0.01" data-row="${d}" data-k="grams" oninput="updateTotals()"></td>
+      <td><input type="text" data-row="${d}" data-k="remarks" style="min-width:90px;"></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById("table-title").textContent = `Daily Log — ${MONTH_NAMES[month-1]} ${year}`;
+  document.getElementById("table-card").style.display = "block";
+  updateTotals();
+}
+
+function updateTotals(){
+  let totalQty = 0, totalLiters = 0, totalGrams = 0;
+  for(let d=1; d<=dayCount; d++){
+    totalQty += parseFloat(document.querySelector(`[data-row="${d}"][data-k="qty"]`)?.value) || 0;
+    totalLiters += parseFloat(document.querySelector(`[data-row="${d}"][data-k="liters"]`)?.value) || 0;
+    totalGrams += parseFloat(document.querySelector(`[data-row="${d}"][data-k="grams"]`)?.value) || 0;
+  }
+  document.getElementById("total-qty").textContent = totalQty;
+  document.getElementById("total-liters").textContent = totalLiters;
+  document.getElementById("total-grams").textContent = totalGrams;
+}
+
+function val(d,k){
+  const el = document.querySelector(`[data-row="${d}"][data-k="${k}"]`);
+  return el ? el.value : "";
+}
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function collectRows(){
+  const rows = [];
+  const monthVal = document.getElementById("f-month").value;
+  if(!monthVal || dayCount === 0) return rows;
+  const [year, month] = monthVal.split("-").map(Number);
+  for(let d=1; d<=dayCount; d++){
+    const dateLabel = `${String(d).padStart(2,"0")} ${MONTH_ABBR[month-1]} ${year}`;
+    rows.push([
+      dateLabel,
+      val(d,"vitamin"),
+      val(d,"medicine"),
+      val(d,"qty"),
+      val(d,"liters"),
+      val(d,"grams"),
+      val(d,"remarks"),
+    ]);
+  }
+  return rows;
+}
+
+function generatePDF(){
+  const monthVal = document.getElementById("f-month").value;
+  if(!monthVal || dayCount === 0){ alert("Build the month's days first."); return; }
+  const [year, month] = monthVal.split("-").map(Number);
+  const staff = document.getElementById("f-staff").value;
+  const position = document.getElementById("f-position").value;
+  const sig = document.getElementById("f-sig").value;
+  const submitted = document.getElementById("f-submitted").value;
+  const totalQty = document.getElementById("total-qty").textContent;
+  const totalLiters = document.getElementById("total-liters").textContent;
+  const totalGrams = document.getElementById("total-grams").textContent;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 34;
+  const marginR = 34;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.text("CPL POULTRY DIVISION", pageW/2, 30, {align:"center"});
+  doc.setFontSize(12);
+  doc.text(`MONITOR CHECKLIST — ${MONTH_NAMES[month-1].toUpperCase()} ${year}`, pageW/2, 46, {align:"center"});
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Staff Name: ${staff || "_______________________"}`, marginL, 62);
+  doc.text(`Position: ${position || "_______________________"}`, marginL + 280, 62);
+
+  const rows = collectRows();
+
+  doc.autoTable({
+    startY: 72,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["Date","Multi-Vitamins (Name)","Type of Medicine","Quantity (Units/Sachets)","Liters (L)","Grams (g)","Remarks"]],
+    body: rows,
+    columnStyles:{0:{fontStyle:"bold",cellWidth:52}},
+  });
+
+  let y = doc.lastAutoTable.finalY + 16;
+  if(y > 740){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(9.5);
+  doc.text(`MONTHLY TOTAL — Quantity: ${totalQty}`, marginL, y);
+  doc.text(`Liters: ${totalLiters}`, marginL + 220, y);
+  doc.text(`Grams: ${totalGrams}`, marginL + 340, y);
+  y += 26;
+
+  doc.setFont("helvetica","normal");
+  doc.text(`Staff Signature: ${sig || "_______________________"}`, marginL, y);
+  doc.text(`Date Submitted: ${fmtDate(submitted) || "_______________________"}`, marginL + 280, y);
+
+  const fname = `Monitor_Checklist_${MONTH_NAMES[month-1]}_${year}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.getElementById("f-month").value = "";
+  document.getElementById("f-staff").value = "";
+  document.getElementById("f-position").value = "";
+  document.getElementById("f-sig").value = "";
+  document.getElementById("f-submitted").value = "";
+  document.querySelector("#monitor-table tbody").innerHTML = "";
+  document.getElementById("table-card").style.display = "none";
+  dayCount = 0;
+  document.getElementById("total-qty").textContent = "0";
+  document.getElementById("total-liters").textContent = "0";
+  document.getElementById("total-grams").textContent = "0";
+}
+</script>
+</body>
+</html>

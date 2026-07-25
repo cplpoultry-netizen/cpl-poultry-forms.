@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brooder Box Checklist</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{max-width:720px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:110px;}
+  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+  table.grid th{
+    background:#eef1e8;
+    color:var(--green-dark);
+    padding:6px 4px;
+    font-size:11px;
+    text-align:center;
+    border:1px solid var(--line);
+    position:sticky;
+    top:0;
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:3px;
+    text-align:center;
+  }
+  table.grid td.num{
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+    width:26px;
+  }
+  table.grid input{
+    padding:6px 3px;
+    font-size:13px;
+    text-align:center;
+    min-width:38px;
+  }
+  .scroll-y{ max-height:56vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; }
+  .scroll-y table.grid th{ position:sticky; top:0; z-index:1; }
+
+  .grand-total{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+    padding-top:10px;
+    border-top:2px solid var(--green);
+    font-size:15px;
+    font-weight:700;
+  }
+  .grand-total span.value{ color:var(--amber); font-size:20px; }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Brooder Box Checklist</h1>
+  <p>Breeder Farm — CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Details</h2>
+    <div class="row">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Name</label><input type="text" id="f-name" placeholder="e.g. Robert. W"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Brooder Boxes 1–27</h2>
+    <div class="scroll-y">
+      <table class="grid" id="brooder-table">
+        <thead>
+          <tr><th>No.</th><th>Bird Count</th><th>Mortalities</th><th>Cull</th><th>Disabled</th><th>Sold Chicks</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="grand-total">
+      <span>Grand Total (Mortalities)</span>
+      <span class="value" id="grand-total-mort">0</span>
+    </div>
+    <div class="grand-total">
+      <span>Grand Total (Cull)</span>
+      <span class="value" id="grand-total-cull">0</span>
+    </div>
+    <div class="grand-total">
+      <span>Grand Total (Disabled)</span>
+      <span class="value" id="grand-total-dis">0</span>
+    </div>
+    <div class="grand-total">
+      <span>Grand Total (Bird Count)</span>
+      <span class="value" id="grand-total-count">0</span>
+    </div>
+    <div class="grand-total">
+      <span>Grand Total (Chicks Sold)</span>
+      <span class="value" id="grand-total-sold">0</span>
+    </div>
+  </div>
+
+  <p class="hint">Bird Count starts at 200 for every box by default — edit it anytime if a box has a different starting number. As you add Mortalities, Cull, Disabled, or Sold Chicks, that box's Bird Count reduces automatically.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const BOX_COUNT = 27;
+
+function buildTable(){
+  const tbody = document.querySelector("#brooder-table tbody");
+  for(let i=1;i<=BOX_COUNT;i++){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="num">${i}</td>
+      <td><input type="number" data-row="${i}" data-k="count" value="200" oninput="onCountInput(${i})"></td>
+      <td><input type="number" data-row="${i}" data-k="mort" oninput="updateRow(${i})"></td>
+      <td><input type="number" data-row="${i}" data-k="cull" oninput="updateRow(${i})"></td>
+      <td><input type="number" data-row="${i}" data-k="dis" oninput="updateRow(${i})"></td>
+      <td><input type="number" data-row="${i}" data-k="sold" oninput="updateRow(${i})"></td>
+    `;
+    tbody.appendChild(tr);
+    rowBase[i] = 200;
+  }
+}
+
+// Tracks the starting bird count entered for each row, before any removals were subtracted.
+const rowBase = {};
+
+function getRemoved(i){
+  const mort = parseFloat(document.querySelector(`[data-row="${i}"][data-k="mort"]`).value) || 0;
+  const cull = parseFloat(document.querySelector(`[data-row="${i}"][data-k="cull"]`).value) || 0;
+  const dis = parseFloat(document.querySelector(`[data-row="${i}"][data-k="dis"]`).value) || 0;
+  const sold = parseFloat(document.querySelector(`[data-row="${i}"][data-k="sold"]`).value) || 0;
+  return mort + cull + dis + sold;
+}
+
+// Called when the user types directly into the Bird Count box (setting or resetting the starting count).
+function onCountInput(i){
+  const countInput = document.querySelector(`[data-row="${i}"][data-k="count"]`);
+  const typed = parseFloat(countInput.value) || 0;
+  rowBase[i] = typed + getRemoved(i);
+  updateRow(i, true);
+}
+
+// Called when Mortalities, Cull, or Disabled changes — reduces the Bird Count by the new total automatically.
+function updateRow(i, skipCountUpdate){
+  const removed = getRemoved(i);
+
+  if(!skipCountUpdate && rowBase[i] !== undefined){
+    const countInput = document.querySelector(`[data-row="${i}"][data-k="count"]`);
+    countInput.value = rowBase[i] - removed;
+  }
+
+  updateGrandTotal();
+}
+
+function updateGrandTotal(){
+  let grandMort = 0;
+  let grandCull = 0;
+  let grandDis = 0;
+  let grandCount = 0;
+  let grandSold = 0;
+  for(let i=1;i<=BOX_COUNT;i++){
+    grandMort += parseFloat(document.querySelector(`[data-row="${i}"][data-k="mort"]`).value) || 0;
+    grandCull += parseFloat(document.querySelector(`[data-row="${i}"][data-k="cull"]`).value) || 0;
+    grandDis += parseFloat(document.querySelector(`[data-row="${i}"][data-k="dis"]`).value) || 0;
+    grandCount += parseFloat(document.querySelector(`[data-row="${i}"][data-k="count"]`).value) || 0;
+    grandSold += parseFloat(document.querySelector(`[data-row="${i}"][data-k="sold"]`).value) || 0;
+  }
+  document.getElementById("grand-total-mort").textContent = grandMort;
+  document.getElementById("grand-total-cull").textContent = grandCull;
+  document.getElementById("grand-total-dis").textContent = grandDis;
+  document.getElementById("grand-total-count").textContent = grandCount;
+  document.getElementById("grand-total-sold").textContent = grandSold;
+}
+
+buildTable();
+updateGrandTotal();
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function collectRows(){
+  const rows = [];
+  for(let i=1;i<=BOX_COUNT;i++){
+    const count = document.querySelector(`[data-row="${i}"][data-k="count"]`).value;
+    const mort = document.querySelector(`[data-row="${i}"][data-k="mort"]`).value;
+    const cull = document.querySelector(`[data-row="${i}"][data-k="cull"]`).value;
+    const dis = document.querySelector(`[data-row="${i}"][data-k="dis"]`).value;
+    const sold = document.querySelector(`[data-row="${i}"][data-k="sold"]`).value;
+    rows.push([i, count, mort, cull, dis, sold]);
+  }
+  return rows;
+}
+
+function generatePDF(){
+  const date = document.getElementById("f-date").value;
+  const name = document.getElementById("f-name").value;
+  const grandMort = document.getElementById("grand-total-mort").textContent;
+  const grandCull = document.getElementById("grand-total-cull").textContent;
+  const grandDis = document.getElementById("grand-total-dis").textContent;
+  const grandCount = document.getElementById("grand-total-count").textContent;
+  const grandSold = document.getElementById("grand-total-sold").textContent;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 40;
+  const marginR = 40;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(14);
+  doc.text("BROODER BOX CHECKLIST", pageW/2, 34, {align:"center"});
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(10);
+  doc.text(`Date: ${fmtDate(date) || "_______________________"}`, marginL, 54);
+  doc.text(`Name: ${name || "_______________________"}`, marginL + 260, 54);
+
+  const rows = collectRows();
+
+  doc.autoTable({
+    startY: 68,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:9.5, cellPadding:3.5, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["Brooder Number","Bird Count","Mortalities","Cull","Disabled","Sold Chicks"]],
+    body: rows,
+    columnStyles:{0:{fontStyle:"bold"}},
+  });
+
+  let y = doc.lastAutoTable.finalY + 20;
+  if(y > 700){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(11);
+  doc.text(`GRAND TOTAL (Mortalities): ${grandMort}`, marginL, y);
+  y += 16;
+  doc.text(`GRAND TOTAL (Cull): ${grandCull}`, marginL, y);
+  y += 16;
+  doc.text(`GRAND TOTAL (Disabled): ${grandDis}`, marginL, y);
+  y += 16;
+  doc.text(`GRAND TOTAL (Bird Count): ${grandCount}`, marginL, y);
+  y += 16;
+  doc.text(`GRAND TOTAL (Chicks Sold): ${grandSold}`, marginL, y);
+
+  const fname = `Brooder_Box_Checklist_${date || "draft"}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.querySelectorAll("input[type='number']").forEach(i=>i.value="");
+  for(let i=1;i<=BOX_COUNT;i++){
+    document.querySelector(`[data-row="${i}"][data-k="count"]`).value = "200";
+    rowBase[i] = 200;
+  }
+  updateGrandTotal();
+  document.getElementById("f-date").value = "";
+  document.getElementById("f-name").value = "";
+}
+</script>
+</body>
+</html>

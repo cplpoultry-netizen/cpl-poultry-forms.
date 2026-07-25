@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hatchery Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{max-width:600px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .field{ margin-bottom:10px; }
+  .field:last-child{ margin-bottom:0; }
+  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  input{
+    width:100%;
+    padding:9px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14.5px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  input[readonly]{ background:#f0efe8; color:var(--green-dark); font-weight:700; }
+
+  .remove-btn{
+    background:none;
+    border:none;
+    color:#a33b2b;
+    font-size:13px;
+    font-weight:700;
+  }
+  .add-row{
+    margin-top:6px;
+    background:none;
+    border:1px dashed var(--green);
+    color:var(--green-dark);
+    padding:9px 12px;
+    border-radius:6px;
+    font-size:13px;
+    font-weight:600;
+    width:100%;
+  }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hatchery Report</h1>
+  <p>Breeder Farm & Hatchery — CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Report Details</h2>
+    <div class="field"><label>Date</label><input type="date" id="report-date"></div>
+    <div class="field"><label>Recorded By</label><input type="text" id="report-name" placeholder="e.g. Robert. W"></div>
+  </div>
+
+  <div id="batches-container"></div>
+
+  <button class="add-row" onclick="addBatch()">+ Add another batch</button>
+
+  <p class="hint">Each batch is its own block. Leave any box blank if you don't have that number yet. Fertile Percentage fills in automatically once you enter Hatch Chicks and Candling (Fertile Eggs), rounded to a whole number.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+let batchCount = 0;
+
+const FIELDS = [
+  { k:"hatchDate", label:"Hatch Date", type:"date" },
+  { k:"transferDate", label:"Transfer Date", type:"date" },
+  { k:"batchNo", label:"Batch Number", type:"text" },
+  { k:"eggSet", label:"Egg Set", type:"number" },
+  { k:"hatchChicks", label:"Hatch Chicks", type:"number" },
+  { k:"salable", label:"Salable Chicks", type:"number" },
+  { k:"fertile", label:"Candling (Fertile Eggs)", type:"number" },
+  { k:"fertilePct", label:"Fertile Percentage", type:"computed" },
+  { k:"infertile", label:"Infertile", type:"number" },
+  { k:"mortality", label:"Mortality", type:"number" },
+  { k:"cull", label:"Cull", type:"number" },
+  { k:"unhatched", label:"Un-hatched Chicks", type:"number" },
+  { k:"deadInCells", label:"Dead in Cells", type:"number" },
+];
+
+function addBatch(){
+  const container = document.getElementById("batches-container");
+  const i = batchCount++;
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = `batch-${i}`;
+
+  const fieldsHtml = FIELDS.map(f => `
+    <div class="field">
+      <label>${f.label}</label>
+      <input type="${f.type === 'computed' ? 'text' : f.type}" data-i="${i}" data-k="${f.k}" ${f.type === 'computed' ? 'readonly placeholder="—"' : ''}>
+    </div>
+  `).join("");
+
+  card.innerHTML = `
+    <h2>
+      <span>Batch <span class="batch-num">${i+1}</span></span>
+      <button class="remove-btn" onclick="removeBatch(${i})">Remove ✕</button>
+    </h2>
+    ${fieldsHtml}
+  `;
+  container.appendChild(card);
+
+  const hatchInput = card.querySelector(`[data-i="${i}"][data-k="hatchChicks"]`);
+  const fertileInput = card.querySelector(`[data-i="${i}"][data-k="fertile"]`);
+  hatchInput.addEventListener("input", ()=>calcFertilePct(i));
+  fertileInput.addEventListener("input", ()=>calcFertilePct(i));
+}
+
+function calcFertilePct(i){
+  const hatch = parseFloat(val(i,"hatchChicks"));
+  const fertile = parseFloat(val(i,"fertile"));
+  const outputEl = document.querySelector(`[data-i="${i}"][data-k="fertilePct"]`);
+  if(!isNaN(hatch) && !isNaN(fertile) && fertile !== 0){
+    const pct = (hatch / fertile) * 100;
+    outputEl.value = Math.round(pct) + "%";
+  } else {
+    outputEl.value = "";
+  }
+}
+
+function removeBatch(i){
+  const card = document.getElementById(`batch-${i}`);
+  if(card) card.remove();
+  renumberBatches();
+}
+
+function renumberBatches(){
+  const cards = document.querySelectorAll("#batches-container .card");
+  cards.forEach((c,idx)=>{
+    c.querySelector(".batch-num").textContent = idx+1;
+  });
+}
+
+addBatch();
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function val(i,k){
+  const el = document.querySelector(`[data-i="${i}"][data-k="${k}"]`);
+  return el ? el.value : "";
+}
+
+function collectBatches(){
+  const batches = [];
+  const cards = document.querySelectorAll("#batches-container .card");
+  cards.forEach(card=>{
+    const i = card.id.replace("batch-","");
+    const hasData = FIELDS.some(f => val(i,f.k) !== "");
+    if(!hasData) return;
+    const entry = {};
+    FIELDS.forEach(f=>{
+      entry[f.k] = f.type === "date" ? fmtDate(val(i,f.k)) : val(i,f.k);
+    });
+    batches.push(entry);
+  });
+  return batches;
+}
+
+function generatePDF(){
+  const reportDate = document.getElementById("report-date").value;
+  const reportName = document.getElementById("report-name").value;
+  const batches = collectBatches();
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 50;
+  const marginR = 50;
+  let y = 40;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(16);
+  doc.setTextColor(0,0,0);
+  doc.text("HATCHERY REPORT", pageW/2, y, {align:"center"});
+  y += 26;
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(10.5);
+  doc.text(`Date: ${fmtDate(reportDate) || "_______________________"}`, marginL, y);
+  y += 16;
+  doc.text(`Recorded By: ${reportName || "_______________________"}`, marginL, y);
+  y += 18;
+
+  batches.forEach((batch, idx)=>{
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(12);
+    doc.setTextColor(43,65,39);
+    doc.text(`Batch ${idx+1}`, marginL, y + 14);
+
+    const body = FIELDS.map(f=>{
+      const value = batch[f.k] || "";
+      return [f.label, String(value)];
+    });
+
+    doc.autoTable({
+      startY: y + 22,
+      margin:{left:marginL,right:marginR},
+      styles:{ fontSize:10, cellPadding:5, lineColor:[180,180,170], lineWidth:0.5 },
+      theme:"grid",
+      columnStyles:{
+        0:{ halign:"left", fontStyle:"bold", cellWidth: (pageW - marginL - marginR) * 0.55 },
+        1:{ halign:"right", textColor:[200,30,30], fontStyle:"bold" },
+      },
+      body: body,
+    });
+
+    y = doc.lastAutoTable.finalY + 24;
+
+    if(y > 760 && idx < batches.length - 1){
+      doc.addPage();
+      y = 40;
+    }
+  });
+
+  const fname = `Hatchery_Report_${reportDate || "draft"}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.getElementById("batches-container").innerHTML = "";
+  batchCount = 0;
+  addBatch();
+  document.getElementById("report-date").value = "";
+  document.getElementById("report-name").value = "";
+}
+</script>
+</body>
+</html>
