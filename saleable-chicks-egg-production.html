@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saleable Chicks & Egg Production</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --blue:#3b5a80;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{max-width:900px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;align-items:flex-end;}
+  .field{flex:1;min-width:130px;}
+  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  input[readonly]{ background:#f0efe8; color:var(--green-dark); font-weight:700; }
+
+  .rebuild-btn{
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:9px 14px;
+    border-radius:6px;
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+  table.grid th{
+    background:#eef1e8;
+    color:var(--green-dark);
+    padding:6px 4px;
+    font-size:10.5px;
+    text-align:center;
+    border:1px solid var(--line);
+    white-space:nowrap;
+    position:sticky;
+    top:0;
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:4px;
+    text-align:center;
+  }
+  table.grid td.week-cell, table.grid td.date-cell{
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+    white-space:nowrap;
+    font-size:11px;
+  }
+  th.col-chicks{ background:#f3d9d6; color:#7a1f16; border-bottom:3px solid #b3261e; }
+  th.col-eggsprod{ background:#dde5ee; color:#22344a; border-bottom:3px solid #3b5a80; }
+  th.col-eggsales{ background:#f5e6cf; color:#5a3d10; border-bottom:3px solid #c98a2c; }
+  td.col-chicks{ background:rgba(179,38,30,0.06); }
+  td.col-eggsprod{ background:rgba(59,90,128,0.06); }
+  td.col-eggsales{ background:rgba(201,138,44,0.08); }
+  td.col-chicks input{ border-left:3px solid #b3261e; }
+  td.col-eggsprod input{ border-left:3px solid #3b5a80; }
+  td.col-eggsales input{ border-left:3px solid #c98a2c; }
+  .key-strip{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    font-size:11.5px;
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  .key-strip span{ display:flex; align-items:center; gap:5px; }
+  table.grid input{
+    padding:6px 4px;
+    font-size:13px;
+    text-align:center;
+    min-width:70px;
+  }
+  .scroll-x{ overflow-x:auto; }
+  .scroll-y{ max-height:52vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; }
+
+  .chart-title{
+    font-size:13px;
+    font-weight:700;
+    color:var(--green-dark);
+    margin:0 0 8px;
+  }
+  .chart-scroll{ overflow-x:auto; }
+  .chart-inner{ min-width:1400px; height:320px; }
+  .legend-dot{
+    display:inline-block;
+    width:10px;
+    height:10px;
+    border-radius:2px;
+    margin-right:5px;
+  }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Saleable Chicks & Egg Production</h1>
+  <p>CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Year</h2>
+    <div class="row">
+      <div class="field"><label>Year</label><input type="number" id="f-year"></div>
+      <button class="rebuild-btn" onclick="buildYearWeeks()">Rebuild Weeks For This Year</button>
+    </div>
+    <p class="hint">Every Sunday of the year is generated automatically below, with its Week Number, as soon as the app opens.</p>
+  </div>
+
+  <div class="card">
+    <h2>Weekly Entries</h2>
+    <div class="key-strip">
+      <span><span class="legend-dot" style="background:#b3261e;"></span>Saleable Chicks</span>
+      <span><span class="legend-dot" style="background:#3b5a80;"></span>Egg Production</span>
+      <span><span class="legend-dot" style="background:#c98a2c;"></span>Egg Sales</span>
+    </div>
+    <div class="scroll-y">
+      <div class="scroll-x">
+        <table class="grid" id="entry-table">
+          <thead>
+            <tr>
+              <th>Week No.</th>
+              <th>Date (Sunday)</th>
+              <th class="col-chicks">Saleable Chicks</th>
+              <th class="col-eggsprod">Egg Production</th>
+              <th class="col-eggsales">Egg Sales</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="chart-title">
+      <span class="legend-dot" style="background:#b3261e;"></span>Saleable Chicks
+      &nbsp;&nbsp;
+      <span class="legend-dot" style="background:#3b5a80;"></span>Egg Production
+      &nbsp;&nbsp;
+      <span class="legend-dot" style="background:#c98a2c;"></span>Egg Sales
+    </p>
+    <p style="font-size:11px;color:#7a7a6d;margin:0 0 8px;">Bar per week, labeled by that week's Sunday date — scroll sideways to see the whole year.</p>
+    <div class="chart-scroll">
+      <div class="chart-inner"><canvas id="combo-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recorded By</h2>
+    <div class="row">
+      <div class="field"><label>Name</label><input type="text" id="f-name" placeholder="e.g. Robert Wartovo"></div>
+      <div class="field"><label>Initials</label><input type="text" id="f-initials" placeholder="e.g. R.W."></div>
+    </div>
+  </div>
+
+  <p class="hint">Fill in whichever weeks you have numbers for — the rest can stay blank. The graph and PDF update as you type.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+let weekCount = 0;
+let comboChart;
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function isoDate(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+function getSundaysInYear(year){
+  const sundays = [];
+  const d = new Date(year, 0, 1);
+  while(d.getDay() !== 0){ d.setDate(d.getDate() + 1); }
+  while(d.getFullYear() === year){
+    sundays.push(new Date(d));
+    d.setDate(d.getDate() + 7);
+  }
+  return sundays;
+}
+
+function buildYearWeeks(){
+  const year = parseInt(document.getElementById("f-year").value) || new Date().getFullYear();
+  document.getElementById("f-year").value = year;
+
+  const sundays = getSundaysInYear(year);
+  const tbody = document.querySelector("#entry-table tbody");
+  tbody.innerHTML = "";
+  weekCount = sundays.length;
+
+  sundays.forEach((sunday, idx)=>{
+    const w = idx + 1;
+    const dateIso = isoDate(sunday);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="week-cell">Week ${w}</td>
+      <td class="date-cell">${fmtDate(dateIso)}</td>
+      <td class="col-chicks"><input type="number" min="0" data-w="${w}" data-k="chicks" oninput="refreshCharts()"></td>
+      <td class="col-eggsprod"><input type="number" min="0" data-w="${w}" data-k="eggsProd" oninput="refreshCharts()"></td>
+      <td class="col-eggsales"><input type="number" min="0" data-w="${w}" data-k="eggsSold" oninput="refreshCharts()"></td>
+    `;
+    tr.dataset.date = dateIso;
+    tbody.appendChild(tr);
+  });
+
+  refreshCharts();
+}
+
+function val(w,k){
+  const el = document.querySelector(`[data-w="${w}"][data-k="${k}"]`);
+  return el ? el.value : "";
+}
+
+function collectWeeks(){
+  const weeks = [];
+  const trs = document.querySelectorAll("#entry-table tbody tr");
+  trs.forEach((tr, idx)=>{
+    const w = idx + 1;
+    weeks.push({
+      week: w,
+      date: tr.dataset.date,
+      chicks: parseFloat(val(w,"chicks")) || 0,
+      eggsProd: parseFloat(val(w,"eggsProd")) || 0,
+      eggsSold: parseFloat(val(w,"eggsSold")) || 0,
+    });
+  });
+  return weeks;
+}
+
+function refreshCharts(){
+  const weeks = collectWeeks();
+  const labels = weeks.map(w => fmtDate(w.date));
+  const chicksData = weeks.map(w => w.chicks);
+  const eggsProdData = weeks.map(w => w.eggsProd);
+  const eggsSoldData = weeks.map(w => w.eggsSold);
+
+  if(comboChart) comboChart.destroy();
+
+  const canvas = document.getElementById("combo-chart");
+  document.querySelector(".chart-inner").style.minWidth = Math.max(1400, weeks.length * 26) + "px";
+
+  const ctx = canvas.getContext("2d");
+  comboChart = new Chart(ctx, {
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: "bar",
+          label: "Saleable Chicks",
+          data: chicksData,
+          backgroundColor: "#b3261e",
+          borderRadius: 3,
+          yAxisID: "y",
+        },
+        {
+          type: "bar",
+          label: "Egg Production",
+          data: eggsProdData,
+          backgroundColor: "#3b5a80",
+          borderRadius: 3,
+          yAxisID: "y1",
+        },
+        {
+          type: "bar",
+          label: "Egg Sales",
+          data: eggsSoldData,
+          backgroundColor: "#c98a2c",
+          borderRadius: 3,
+          yAxisID: "y1",
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: "bottom",
+          labels: { font: { size: 11 } }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            font: { size: 11, weight: "bold" },
+            color: "#1f2a1f",
+            maxRotation: 60,
+            minRotation: 45
+          }
+        },
+        y: {
+          type: "linear",
+          position: "left",
+          beginAtZero: true,
+          title: { display: true, text: "Saleable Chicks", font: { size: 10 } },
+          ticks: { font: { size: 10 } }
+        },
+        y1: {
+          type: "linear",
+          position: "right",
+          beginAtZero: true,
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "Egg Production / Sales", font: { size: 10 } },
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+document.getElementById("f-year").value = new Date().getFullYear();
+buildYearWeeks();
+
+function generatePDF(){
+  const weeks = collectWeeks();
+  const year = document.getElementById("f-year").value;
+  const name = document.getElementById("f-name").value;
+  const initials = document.getElementById("f-initials").value;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4", orientation:"landscape" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginL = 40;
+  const marginR = 40;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(15);
+  doc.text("SALEABLE CHICKS & EGG PRODUCTION", pageW/2, 30, {align:"center"});
+  doc.setFontSize(10.5);
+  doc.text(`Year: ${year}`, pageW/2, 46, {align:"center"});
+
+  const rows = weeks
+    .filter(w => w.chicks || w.eggsProd || w.eggsSold)
+    .map(w => [`Week ${w.week}`, fmtDate(w.date), w.chicks, w.eggsProd, w.eggsSold]);
+
+  doc.autoTable({
+    startY: 58,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:9, cellPadding:4, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+    head:[["Week","Date (Sunday)","Saleable Chicks","Egg Production","Egg Sales"]],
+    body: rows.length ? rows : [["—","—","—","—","—"]],
+  });
+
+  let y = doc.lastAutoTable.finalY + 20;
+
+  const comboCanvas = document.getElementById("combo-chart");
+  const imgW = pageW - marginL - marginR;
+  const imgH = imgW * (comboCanvas.height / comboCanvas.width);
+
+  if(y + imgH + 20 > pageH - 30){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(11);
+  doc.setTextColor(43,65,39);
+  doc.text("Saleable Chicks, Egg Production & Egg Sales — Weekly (Sunday)", marginL, y);
+  doc.setTextColor(0,0,0);
+  y += 8;
+  doc.addImage(comboCanvas.toDataURL("image/png",1.0), "PNG", marginL, y, imgW, imgH);
+  y += imgH + 30;
+
+  if(y > pageH - 20){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(10);
+  doc.text(`Recorded By: ${name || "_______________________"}`, marginL, y);
+  doc.text(`Initials: ${initials || "______"}`, marginL + 300, y);
+
+  const fname = `Saleable_Chicks_Egg_Production_${year}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered numbers for this year? Weeks and dates will stay.")) return;
+  document.querySelectorAll("#entry-table tbody input[type='number']").forEach(i=>{ i.value=""; });
+  refreshCharts();
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-initials").value = "";
+}
+</script>
+</body>
+</html>
