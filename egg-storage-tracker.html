@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Egg Storage Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{max-width:960px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:14px;
+    margin:0 0 10px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+  }
+  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  .legend-note{
+    font-size:11px;
+    color:#6a6a5e;
+    margin:6px 0 10px;
+  }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+  }
+  table.grid th{
+    background:#eef1e8;
+    color:var(--green-dark);
+    padding:8px 5px;
+    font-size:11px;
+    font-weight:700;
+    text-align:center;
+    border:1px solid var(--line);
+    border-bottom:2px solid var(--green);
+    white-space:nowrap;
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:4px;
+    text-align:center;
+  }
+  table.grid td.date-cell{
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+    white-space:nowrap;
+  }
+  table.grid input{
+    padding:6px 4px;
+    font-size:13px;
+    font-weight:700;
+    text-align:center;
+    min-width:64px;
+    color:var(--ink);
+  }
+  .scroll-x{ overflow-x:auto; }
+  .remove-btn{
+    background:none;
+    border:none;
+    color:#a33b2b;
+    font-size:15px;
+    padding:0 4px;
+  }
+  .add-row{
+    margin-top:10px;
+    background:none;
+    border:1px dashed var(--green);
+    color:var(--green-dark);
+    padding:8px 12px;
+    border-radius:6px;
+    font-size:12.5px;
+    font-weight:600;
+    width:100%;
+  }
+
+  .grand-total{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:6px 0;
+    font-size:12.5px;
+    font-weight:700;
+    border-bottom:1px solid var(--line);
+  }
+  .grand-total:last-child{ border-bottom:none; }
+  .grand-total .dot{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
+  .grand-total .value{ color:var(--green-dark); }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Egg Storage Tracker</h1>
+  <p>CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Daily Entries</h2>
+    <div class="scroll-x">
+      <table class="grid" id="egg-table">
+        <thead>
+          <tr id="table-head-row"><th>Date</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="add-row" onclick="addRow()">+ Add date entry</button>
+  </div>
+
+  <div class="card">
+    <h2>Category Totals — Bar Graph</h2>
+    <p style="font-size:11px;color:#7a7a6d;margin:0 0 8px;">One bar per category. Grand Total is not shown here.</p>
+    <div style="position:relative;height:260px;">
+      <canvas id="egg-chart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recorded By</h2>
+    <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:130px;"><label>Name</label><input type="text" id="f-name" placeholder="e.g. Robert Wartovo"></div>
+      <div class="field" style="flex:1;min-width:130px;"><label>Position</label><input type="text" id="f-position" placeholder="e.g. Poultry Supervisor"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Totals</h2>
+    <div id="totals-list"></div>
+    <div class="grand-total" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-size:13px;">
+      <span>Table Eggs</span>
+      <span class="value" id="total-tableEggs" style="color:var(--green-dark);">0</span>
+    </div>
+    <div class="grand-total" style="border-top:2px solid var(--green);margin-top:6px;padding-top:10px;font-size:14px;">
+      <span>Grand Total — All Eggs Combined</span>
+      <span class="value" id="grand-total-all" style="color:var(--amber);font-size:18px;">0</span>
+    </div>
+  </div>
+
+  <p class="hint">Add one row per date. Leave any column blank if there's no count for it that day.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const CATEGORIES = [
+  { k:"minorCrack", label:"Minor Crack Eggs" },
+  { k:"small", label:"Small Eggs" },
+  { k:"extraLarge", label:"Extra Large Eggs" },
+  { k:"missShaped", label:"Miss Shaped Eggs" },
+  { k:"tinShells", label:"Tin Shells Eggs" },
+  { k:"dirty", label:"Dirty Eggs" },
+  { k:"hatchery", label:"Hatchery Eggs (Clean Eggs)" },
+];
+
+let rowCount = 0;
+let eggChart;
+
+function buildHeaderAndKey(){
+  const headRow = document.getElementById("table-head-row");
+  CATEGORIES.forEach(c=>{
+    const th = document.createElement("th");
+    th.textContent = c.label;
+    headRow.appendChild(th);
+  });
+  const removeTh = document.createElement("th");
+  removeTh.textContent = "";
+  headRow.appendChild(removeTh);
+
+  const totalsList = document.getElementById("totals-list");
+  CATEGORIES.forEach(c=>{
+    const div = document.createElement("div");
+    div.className = "grand-total";
+    div.innerHTML = `
+      <span>${c.label}</span>
+      <span class="value" id="total-${c.k}">0</span>
+    `;
+    totalsList.appendChild(div);
+  });
+}
+
+function addRow(){
+  const tbody = document.querySelector("#egg-table tbody");
+  const i = rowCount++;
+  const tr = document.createElement("tr");
+  tr.id = `row-${i}`;
+
+  let cells = `<td><input type="date" data-i="${i}" data-k="date" style="min-width:120px;"></td>`;
+  CATEGORIES.forEach(c=>{
+    cells += `<td>
+      <input type="number" min="0" data-i="${i}" data-k="${c.k}" oninput="updateTotals()">
+    </td>`;
+  });
+
+  tr.innerHTML = cells + `<td><button class="remove-btn" onclick="removeRow(${i})">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function removeRow(i){
+  const row = document.getElementById(`row-${i}`);
+  if(row) row.remove();
+  updateTotals();
+}
+
+function val(i,k){
+  const el = document.querySelector(`[data-i="${i}"][data-k="${k}"]`);
+  return el ? el.value : "";
+}
+
+function updateTotals(){
+  const totals = {};
+  CATEGORIES.forEach(c => totals[c.k] = 0);
+  const trs = document.querySelectorAll("#egg-table tbody tr");
+  trs.forEach(tr=>{
+    const i = tr.id.replace("row-","");
+    CATEGORIES.forEach(c=>{
+      totals[c.k] += parseFloat(val(i,c.k)) || 0;
+    });
+  });
+  let grandAll = 0;
+  CATEGORIES.forEach(c=>{
+    document.getElementById(`total-${c.k}`).textContent = totals[c.k];
+    grandAll += totals[c.k];
+  });
+
+  const tableEggs = totals.minorCrack + totals.small + totals.extraLarge + totals.missShaped + totals.tinShells + totals.dirty;
+  document.getElementById("total-tableEggs").textContent = tableEggs;
+  document.getElementById("grand-total-all").textContent = grandAll;
+
+  refreshChart(totals);
+}
+
+function refreshChart(totals){
+  if(eggChart) eggChart.destroy();
+  const ctx = document.getElementById("egg-chart").getContext("2d");
+  eggChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: CATEGORIES.map(c => c.label),
+      datasets: [{
+        data: CATEGORIES.map(c => totals[c.k]),
+        backgroundColor: "#3f5d3a",
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 9.5, weight: "bold" }, maxRotation: 40, minRotation: 20 } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+buildHeaderAndKey();
+addRow();
+updateTotals();
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function collectRows(){
+  const rows = [];
+  const trs = document.querySelectorAll("#egg-table tbody tr");
+  trs.forEach(tr=>{
+    const i = tr.id.replace("row-","");
+    const date = val(i,"date");
+    const hasData = CATEGORIES.some(c => val(i,c.k) !== "");
+    if(!date && !hasData) return;
+    const row = [fmtDate(date)];
+    CATEGORIES.forEach(c=> row.push(val(i,c.k)));
+    rows.push(row);
+  });
+  return rows;
+}
+
+function generatePDF(){
+  const rows = collectRows();
+  const name = document.getElementById("f-name").value;
+  const position = document.getElementById("f-position").value;
+  const grandAll = document.getElementById("grand-total-all").textContent;
+  const tableEggs = document.getElementById("total-tableEggs").textContent;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 30;
+  const marginR = 30;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(14);
+  doc.text("EGG STORAGE TRACKER", pageW/2, 30, {align:"center"});
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Name: ${name || "_______________________"}`, marginL, 46);
+  doc.text(`Position: ${position || "_______________________"}`, marginL + 260, 46);
+
+  const head = ["Date"].concat(CATEGORIES.map(c => c.label));
+  const columnStyles = { 0: { fontStyle:"bold", halign:"left" } };
+  CATEGORIES.forEach((c, idx)=>{
+    columnStyles[idx+1] = { fontStyle:"bold" };
+  });
+
+  doc.autoTable({
+    startY: 58,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:6.8, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.4, fontStyle:"bold" },
+    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold", fontSize:6.5 },
+    head:[head],
+    body: rows,
+    columnStyles: columnStyles,
+  });
+
+  let y = doc.lastAutoTable.finalY + 20;
+  if(y > 740){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(10.5);
+  doc.setTextColor(0,0,0);
+  doc.text("TOTALS", marginL, y);
+  y += 16;
+  doc.setFontSize(9.5);
+  CATEGORIES.forEach(c=>{
+    const total = document.getElementById(`total-${c.k}`).textContent;
+    doc.text(`${c.label}: ${total}`, marginL, y);
+    y += 14;
+  });
+  y += 6;
+  doc.setFontSize(10);
+  doc.text(`Table Eggs: ${tableEggs}`, marginL, y);
+  y += 18;
+  doc.setFontSize(11.5);
+  doc.text(`GRAND TOTAL — All Eggs Combined: ${grandAll}`, marginL, y);
+  y += 20;
+
+  const chartCanvas = document.getElementById("egg-chart");
+  const imgW = pageW - marginL - marginR;
+  const imgH = imgW * (chartCanvas.height / chartCanvas.width);
+  if(y + imgH + 20 > 800){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(10.5);
+  doc.text("Category Totals — Bar Graph", marginL, y);
+  y += 8;
+  doc.addImage(chartCanvas.toDataURL("image/png",1.0), "PNG", marginL, y, imgW, imgH);
+
+  const fname = `Egg_Storage_Tracker_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.querySelector("#egg-table tbody").innerHTML = "";
+  rowCount = 0;
+  addRow();
+  updateTotals();
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-position").value = "";
+}
+</script>
+</body>
+</html>
