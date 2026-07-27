@@ -248,6 +248,7 @@ const CATEGORIES = [
   { k:"missShaped", label:"Miss Shaped Eggs" },
   { k:"tinShells", label:"Tin Shells Eggs" },
   { k:"dirty", label:"Dirty Eggs" },
+  { k:"brown", label:"Brown Eggs" },
   { k:"hatchery", label:"Hatchery Eggs (Clean Eggs)" },
 ];
 
@@ -321,7 +322,7 @@ function updateTotals(){
     grandAll += totals[c.k];
   });
 
-  const tableEggs = totals.minorCrack + totals.small + totals.medium + totals.large + totals.extraLarge + totals.missShaped + totals.tinShells + totals.dirty;
+  const tableEggs = totals.minorCrack + totals.small + totals.medium + totals.large + totals.extraLarge + totals.missShaped + totals.tinShells + totals.dirty + totals.brown;
   document.getElementById("total-tableEggs").textContent = tableEggs;
   document.getElementById("grand-total-all").textContent = grandAll;
 
