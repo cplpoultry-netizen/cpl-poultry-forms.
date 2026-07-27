@@ -52,6 +52,28 @@
     border-bottom:2px solid var(--green);
     padding-bottom:6px;
   }
+  .card-header-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:8px;
+    border-bottom:2px solid var(--green);
+    padding-bottom:6px;
+    margin-bottom:10px;
+  }
+  .card-header-row h2{
+    margin:0;
+    border-bottom:none;
+    padding-bottom:0;
+  }
+  .header-note{
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--green-dark);
+    text-transform:none;
+    letter-spacing:0;
+  }
   label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
   input{
     width:100%;
@@ -164,7 +186,10 @@
 <div class="wrap">
 
   <div class="card">
-    <h2>Daily Entries</h2>
+    <div class="card-header-row">
+      <h2 style="border-bottom:none;padding-bottom:0;">Daily Entries</h2>
+      <span class="header-note">Egg count is updated every 9am, 12pm & 4pm</span>
+    </div>
     <div class="scroll-x">
       <table class="grid" id="egg-table">
         <thead>
