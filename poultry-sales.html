@@ -134,6 +134,25 @@
   .btn-primary{ background:var(--amber); color:#fff; }
   .btn-secondary{ background:var(--green-dark); color:#fff; }
   .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+  select{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .customer-btn{
+    padding:9px 12px;
+    border-radius:6px;
+    border:none;
+    font-size:12.5px;
+    font-weight:700;
+    color:#fff;
+  }
+  .customer-btn.add{ background:var(--green-dark); }
+  .customer-btn.remove{ background:#a33b2b; }
 </style>
 </head>
 <body>
@@ -146,11 +165,26 @@
 <div class="wrap">
 
   <div class="card">
+    <h2>Customers</h2>
+    <div class="row">
+      <div class="field" style="flex:2;min-width:180px;">
+        <label>Select Customer</label>
+        <select id="f-customer-select" onchange="onCustomerSelectChange()"></select>
+      </div>
+    </div>
+    <div class="row">
+      <button class="customer-btn add" onclick="addCustomer()">+ Add Customer</button>
+      <button class="customer-btn remove" onclick="removeCustomer()">Remove This Customer</button>
+    </div>
+    <p class="hint">Switch between customers here — each one keeps their own items and quantities. Generate PDF prints every customer's sale in one document.</p>
+  </div>
+
+  <div class="card">
     <h2>Sale Details</h2>
     <div class="row">
-      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
-      <div class="field"><label>Customer Name</label><input type="text" id="f-customer"></div>
-      <div class="field"><label>Sold By</label><input type="text" id="f-soldby"></div>
+      <div class="field"><label>Date</label><input type="date" id="f-date" onchange="syncDomToStore()"></div>
+      <div class="field"><label>Customer Name</label><input type="text" id="f-customer" oninput="onCustomerNameInput()"></div>
+      <div class="field"><label>Sold By</label><input type="text" id="f-soldby" onchange="syncDomToStore()"></div>
     </div>
   </div>
 
@@ -178,6 +212,26 @@
     <h2>Chick Sales</h2>
     <div class="scroll-x">
       <table class="grid" id="chicks-table">
+        <thead><tr><th>Item</th><th>Price (K)</th><th>Qty</th><th>Subtotal (K)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Minor Crack Eggs</h2>
+    <div class="scroll-x">
+      <table class="grid" id="minorcrack-table">
+        <thead><tr><th>Item</th><th>Price (K)</th><th>Qty</th><th>Subtotal (K)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Brown Eggs</h2>
+    <div class="scroll-x">
+      <table class="grid" id="browneggs-table">
         <thead><tr><th>Item</th><th>Price (K)</th><th>Qty</th><th>Subtotal (K)</th></tr></thead>
         <tbody></tbody>
       </table>
@@ -228,6 +282,44 @@ const CHICKS = [
   { name:"1 Chick", price:8.00 },
 ];
 
+const MINOR_CRACK = [
+  { name:"Minor Crack Loose", price:0.80 },
+  { name:"Minor Crack Dozen", price:9.60 },
+  { name:"Minor Crack Tray", price:24.00 },
+];
+
+const BROWN_EGGS = [
+  { name:"Brown Eggs Loose", price:1.00 },
+  { name:"Brown Eggs Dozen", price:12.00 },
+  { name:"Brown Eggs Tray", price:30.00 },
+];
+
+const CATEGORIES = [
+  { title:"Stockfeed", items: STOCKFEED, prefix:"sf" },
+  { title:"White Eggs", items: EGGS, prefix:"eg" },
+  { title:"Chick Sales", items: CHICKS, prefix:"ck" },
+  { title:"Minor Crack Eggs", items: MINOR_CRACK, prefix:"mc" },
+  { title:"Brown Eggs", items: BROWN_EGGS, prefix:"be" },
+];
+
+function allItems(){
+  const list = [];
+  CATEGORIES.forEach(cat=>{
+    cat.items.forEach((item, i)=>{
+      list.push({ id:`${cat.prefix}-${i}`, name:item.name, price:item.price });
+    });
+  });
+  return list;
+}
+
+let customerOrder = [];
+let customersData = {};
+let nextCustomerIndex = 0;
+let currentCustomer = null;
+
+function blankCustomer(){
+  return { date:"", customerName:"", soldBy:"", qty:{} };
+}
 function buildTable(tableId, items, prefix){
   const tbody = document.querySelector(`#${tableId} tbody`);
   items.forEach((item, i)=>{
@@ -236,35 +328,123 @@ function buildTable(tableId, items, prefix){
     tr.innerHTML = `
       <td class="item-name">${item.name}</td>
       <td class="price">K${item.price.toFixed(2)}</td>
-      <td><input type="number" min="0" data-id="${id}" data-price="${item.price}" data-name="${item.name}" oninput="updateRow('${id}')"></td>
+      <td><input type="number" min="0" data-id="${id}" data-price="${item.price}" data-name="${item.name}" oninput="onQtyInput('${id}')"></td>
       <td class="subtotal" id="sub-${id}">K0.00</td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-function updateRow(id){
-  const input = document.querySelector(`[data-id="${id}"]`);
-  const qty = parseFloat(input.value) || 0;
-  const price = parseFloat(input.dataset.price);
-  const subtotal = qty * price;
-  document.getElementById(`sub-${id}`).textContent = `K${subtotal.toFixed(2)}`;
-  updateGrandTotal();
+function onQtyInput(id){
+  if(currentCustomer !== null){
+    const c = customersData[currentCustomer] || blankCustomer();
+    const el = document.querySelector(`[data-id="${id}"]`);
+    c.qty[id] = el ? el.value : "";
+    customersData[currentCustomer] = c;
+  }
+  updateAllSubtotalsAndTotal();
 }
 
-function updateGrandTotal(){
+function updateAllSubtotalsAndTotal(){
   let grand = 0;
-  document.querySelectorAll("table.grid tbody input[type='number']").forEach(input=>{
-    const qty = parseFloat(input.value) || 0;
-    const price = parseFloat(input.dataset.price);
-    grand += qty * price;
+  allItems().forEach(it=>{
+    const el = document.querySelector(`[data-id="${it.id}"]`);
+    const qty = parseFloat(el ? el.value : "") || 0;
+    const subtotal = qty * it.price;
+    const subEl = document.getElementById(`sub-${it.id}`);
+    if(subEl) subEl.textContent = `K${subtotal.toFixed(2)}`;
+    grand += subtotal;
   });
   document.getElementById("grand-total").textContent = `K${grand.toFixed(2)}`;
+}
+
+function syncDomToStore(){
+  if(currentCustomer === null) return;
+  const c = customersData[currentCustomer] || blankCustomer();
+  c.date = document.getElementById("f-date").value;
+  c.customerName = document.getElementById("f-customer").value;
+  c.soldBy = document.getElementById("f-soldby").value;
+  allItems().forEach(it=>{
+    const el = document.querySelector(`[data-id="${it.id}"]`);
+    c.qty[it.id] = el ? el.value : "";
+  });
+  customersData[currentCustomer] = c;
+}
+
+function loadCustomerIntoDom(i){
+  const c = customersData[i] || blankCustomer();
+  document.getElementById("f-date").value = c.date || "";
+  document.getElementById("f-customer").value = c.customerName || "";
+  document.getElementById("f-soldby").value = c.soldBy || "";
+  allItems().forEach(it=>{
+    const el = document.querySelector(`[data-id="${it.id}"]`);
+    if(el) el.value = c.qty[it.id] || "";
+  });
+  updateAllSubtotalsAndTotal();
+}
+
+function rebuildCustomerSelect(){
+  const select = document.getElementById("f-customer-select");
+  const prevValue = select.value;
+  select.innerHTML = "";
+  customerOrder.forEach((i, idx)=>{
+    const c = customersData[i];
+    const label = (c && c.customerName) ? c.customerName : `Customer ${idx+1}`;
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${idx+1}. ${label}`;
+    select.appendChild(opt);
+  });
+  if(customerOrder.includes(parseInt(prevValue))){
+    select.value = prevValue;
+  }
+}
+
+function addCustomer(){
+  syncDomToStore();
+  const i = nextCustomerIndex++;
+  customerOrder.push(i);
+  customersData[i] = blankCustomer();
+  rebuildCustomerSelect();
+  currentCustomer = i;
+  document.getElementById("f-customer-select").value = i;
+  loadCustomerIntoDom(i);
+}
+
+function removeCustomer(){
+  if(customerOrder.length <= 1){ alert("At least one customer is required."); return; }
+  if(!confirm("Remove this customer's sale entry?")) return;
+  const idx = customerOrder.indexOf(currentCustomer);
+  customerOrder.splice(idx, 1);
+  delete customersData[currentCustomer];
+  const nextIdx = customerOrder[Math.max(0, idx - 1)];
+  rebuildCustomerSelect();
+  currentCustomer = nextIdx;
+  document.getElementById("f-customer-select").value = currentCustomer;
+  loadCustomerIntoDom(currentCustomer);
+}
+
+function onCustomerSelectChange(){
+  syncDomToStore();
+  currentCustomer = parseInt(document.getElementById("f-customer-select").value);
+  loadCustomerIntoDom(currentCustomer);
+}
+
+function onCustomerNameInput(){
+  if(currentCustomer === null) return;
+  const c = customersData[currentCustomer] || blankCustomer();
+  c.customerName = document.getElementById("f-customer").value;
+  customersData[currentCustomer] = c;
+  rebuildCustomerSelect();
+  document.getElementById("f-customer-select").value = currentCustomer;
 }
 
 buildTable("stockfeed-table", STOCKFEED, "sf");
 buildTable("eggs-table", EGGS, "eg");
 buildTable("chicks-table", CHICKS, "ck");
+buildTable("minorcrack-table", MINOR_CRACK, "mc");
+buildTable("browneggs-table", BROWN_EGGS, "be");
+addCustomer();
 
 function fmtDate(d){
   if(!d) return "";
@@ -272,88 +452,109 @@ function fmtDate(d){
   return `${day}/${m}/${y.slice(2)}`;
 }
 
-function collectSection(items, prefix){
-  const rows = [];
-  items.forEach((item,i)=>{
-    const id = `${prefix}-${i}`;
-    const input = document.querySelector(`[data-id="${id}"]`);
-    const qty = parseFloat(input.value) || 0;
-    if(qty <= 0) return;
-    const subtotal = qty * item.price;
-    rows.push([item.name, `K${item.price.toFixed(2)}`, qty, `K${subtotal.toFixed(2)}`]);
-  });
-  return rows;
-}
-
 function generatePDF(){
-  const date = document.getElementById("f-date").value;
-  const customer = document.getElementById("f-customer").value;
-  const soldBy = document.getElementById("f-soldby").value;
-  const grand = document.getElementById("grand-total").textContent;
-
+  syncDomToStore();
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:"pt", format:"a4" });
   const pageW = doc.internal.pageSize.getWidth();
-  const marginL = 44;
-  const marginR = 44;
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginL = 40;
+  const marginR = 40;
+  let y = 34;
 
   doc.setFont("helvetica","bold");
   doc.setFontSize(15);
-  doc.text("POULTRY SALES RECEIPT", pageW/2, 34, {align:"center"});
+  doc.text("POULTRY SALES RECEIPT", pageW/2, y, {align:"center"});
+  y += 22;
 
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(10);
-  doc.text(`Date: ${fmtDate(date) || "_______________________"}`, marginL, 54);
-  doc.text(`Customer: ${customer || "_______________________"}`, marginL + 200, 54);
-  let y = 72;
-  doc.text(`Sold By: ${soldBy || "_______________________"}`, marginL, y);
-  y += 18;
+  let grandAllCustomers = 0;
+  let anyPrinted = false;
 
-  const sections = [
-    { title:"Stockfeed", rows: collectSection(STOCKFEED, "sf") },
-    { title:"White Eggs", rows: collectSection(EGGS, "eg") },
-    { title:"Chick Sales", rows: collectSection(CHICKS, "ck") },
-  ];
+  customerOrder.forEach((i, idx)=>{
+    const c = customersData[i] || blankCustomer();
+    const rows = [];
+    let customerTotal = 0;
 
-  sections.forEach(section=>{
-    if(section.rows.length === 0) return;
+    CATEGORIES.forEach(cat=>{
+      cat.items.forEach((item, itemIdx)=>{
+        const id = `${cat.prefix}-${itemIdx}`;
+        const qty = parseFloat(c.qty[id]) || 0;
+        if(qty <= 0) return;
+        const subtotal = qty * item.price;
+        customerTotal += subtotal;
+        rows.push([item.name, `K${item.price.toFixed(2)}`, qty, `K${subtotal.toFixed(2)}`]);
+      });
+    });
+
+    grandAllCustomers += customerTotal;
+    if(rows.length === 0) return;
+    anyPrinted = true;
+
+    if(y > pageH - 90){ doc.addPage(); y = 40; }
+
     doc.setFont("helvetica","bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(43,65,39);
-    doc.text(section.title, marginL, y + 12);
+    doc.text(`${idx+1}. ${c.customerName || "Customer"}`, marginL, y);
     doc.setTextColor(0,0,0);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(8.5);
+    doc.text(`Date: ${fmtDate(c.date) || "-"}     Sold By: ${c.soldBy || "-"}`, marginL, y + 12);
+    y += 18;
 
     doc.autoTable({
-      startY: y + 18,
+      startY: y,
       margin:{left:marginL,right:marginR},
-      styles:{ fontSize:9.5, cellPadding:4, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
-      headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold" },
+      styles:{ fontSize:8, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+      headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold", fontSize:8 },
       head:[["Item","Price (K)","Qty","Subtotal (K)"]],
-      body: section.rows,
+      body: rows,
       columnStyles:{0:{halign:"left",fontStyle:"bold"}},
     });
-    y = doc.lastAutoTable.finalY + 18;
+    y = doc.lastAutoTable.finalY + 20;
 
-    if(y > 740){ doc.addPage(); y = 40; }
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(179,38,30);
+    doc.text(`Subtotal: K${customerTotal.toFixed(2)}`, pageW - marginR, y, {align:"right"});
+    doc.setTextColor(0,0,0);
+    y += 22;
+
+    if(idx < customerOrder.length - 1){
+      doc.setDrawColor(220,218,205);
+      doc.line(marginL, y - 10, pageW - marginR, y - 10);
+    }
   });
 
-  y += 6;
+  if(!anyPrinted){
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(10);
+    doc.text("No items entered for any customer yet.", marginL, y);
+    y += 20;
+  }
+
+  if(y > pageH - 40){ doc.addPage(); y = 40; }
+  doc.setDrawColor(63,93,58);
+  doc.setLineWidth(1);
+  doc.line(marginL, y, pageW - marginR, y);
+  y += 20;
   doc.setFont("helvetica","bold");
   doc.setFontSize(13);
-  doc.text(`GRAND TOTAL: ${grand}`, marginL, y);
+  doc.setTextColor(179,38,30);
+  doc.text(`GRAND TOTAL (All Customers): K${grandAllCustomers.toFixed(2)}`, marginL, y);
+  doc.setTextColor(0,0,0);
 
-  const fname = `Poultry_Sales_${date || "draft"}.pdf`;
+  const fname = `Poultry_Sales_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
 }
 
 function clearForm(){
-  if(!confirm("Clear all entered data?")) return;
-  document.querySelectorAll("table.grid tbody input[type='number']").forEach(i=>{ i.value=""; });
-  document.querySelectorAll("td.subtotal").forEach(td=>{ td.textContent = "K0.00"; });
-  document.getElementById("grand-total").textContent = "K0.00";
-  document.getElementById("f-date").value = "";
-  document.getElementById("f-customer").value = "";
-  document.getElementById("f-soldby").value = "";
+  if(!confirm("Clear all customers and entered data?")) return;
+  customerOrder = [];
+  customersData = {};
+  nextCustomerIndex = 0;
+  currentCustomer = null;
+  addCustomer();
 }
 </script>
 </body>
