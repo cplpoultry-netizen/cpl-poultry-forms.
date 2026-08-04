@@ -514,59 +514,7 @@ if(typeof clearForm === "function"){
     _origClearForm();
     formTouched = false;
   };
-}/* === Auto-Save & Restore — Hatchery Record ===
-   Paste this block just ABOVE the final </script> tag in hatchery-report.html
-   (right after the existing "Warn before an accidental refresh..." block).
-   This uses your browser's own storage, which only works once the file is
-   actually hosted on your website (e.g. GitHub Pages) — it will not do
-   anything inside Claude's chat preview, and that's expected. */
-
-const HR_STORAGE_KEY = "cpl_hatchery_record_v1";
-
-function hrSaveToStorage(){
-  try{
-    syncDomToStore();
-    const data = {
-      columnOrder: columnOrder,
-      batchesData: batchesData,
-      nextIndex: nextIndex,
-      name: document.getElementById("f-name").value,
-      position: document.getElementById("f-position").value,
-    };
-    localStorage.setItem(HR_STORAGE_KEY, JSON.stringify(data));
-  }catch(e){ /* storage unavailable — safe to ignore */ }
 }
-
-function hrRestoreFromStorage(){
-  let raw;
-  try{ raw = localStorage.getItem(HR_STORAGE_KEY); }catch(e){ return; }
-  if(!raw) return;
-  let data;
-  try{ data = JSON.parse(raw); }catch(e){ return; }
-  if(!data || !Array.isArray(data.columnOrder) || data.columnOrder.length === 0) return;
-
-  columnOrder = data.columnOrder;
-  batchesData = data.batchesData || {};
-  nextIndex = (typeof data.nextIndex === "number") ? data.nextIndex : (Math.max(...columnOrder) + 1);
-  renderTable();
-
-  document.getElementById("f-name").value = data.name || "";
-  document.getElementById("f-position").value = data.position || "";
-}
-
-// Restore any saved batches the moment the page loads (replaces the default blank one).
-hrRestoreFromStorage();
-
-// Save on every change, and wipe the saved copy whenever "Clear" is used.
-document.addEventListener("input", hrSaveToStorage);
-document.addEventListener("change", hrSaveToStorage);
-
-const _origClearFormHR = clearForm;
-clearForm = function(){
-  _origClearFormHR();
-  try{ localStorage.removeItem(HR_STORAGE_KEY); }catch(e){}
-};
-
 </script>
 </body>
 </html>
