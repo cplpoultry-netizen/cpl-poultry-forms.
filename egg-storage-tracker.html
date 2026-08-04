@@ -29,12 +29,13 @@
     background:var(--green-dark);
     color:#fff;
     padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
     position:sticky;
     top:0;
     z-index:10;
   }
-  header h1{ margin:0; font-size:17px; font-weight:700; }
-  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; }
+  header h1{ margin:0; font-size:17px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
   .wrap{max-width:960px;margin:0 auto;padding:14px;}
   .card{
     background:var(--card);
@@ -42,39 +43,46 @@
     border-radius:10px;
     padding:14px;
     margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
   }
   .card h2{
-    font-size:14px;
+    font-size:13px;
     margin:0 0 10px;
-    color:var(--green-dark);
+    color:#fff;
+    background:var(--green-dark);
     text-transform:uppercase;
     letter-spacing:.5px;
-    border-bottom:2px solid var(--green);
-    padding-bottom:6px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
   }
   .card-header-row{
     display:flex;
     justify-content:space-between;
-    align-items:baseline;
+    align-items:center;
     flex-wrap:wrap;
     gap:8px;
-    border-bottom:2px solid var(--green);
-    padding-bottom:6px;
+    background:var(--green-dark);
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+    padding:8px 10px;
     margin-bottom:10px;
   }
   .card-header-row h2{
     margin:0;
-    border-bottom:none;
-    padding-bottom:0;
+    padding:0;
+    background:none;
+    border-left:none;
   }
   .header-note{
-    font-size:11.5px;
+    font-size:10.5px;
     font-weight:700;
-    color:var(--green-dark);
+    color:#fff;
     text-transform:none;
     letter-spacing:0;
+    opacity:.9;
   }
-  label{ display:block; font-size:11.5px; color:#5a5a4f; margin-bottom:3px; font-weight:600; }
+  label{ display:block; font-size:11px; color:#5a5a4f; margin-bottom:3px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
   input{
     width:100%;
     padding:8px 8px;
@@ -83,6 +91,7 @@
     font-size:14px;
     background:#fff;
     color:var(--ink);
+    font-weight:600;
   }
   input:focus{ outline:2px solid var(--green); outline-offset:1px; }
 
@@ -95,22 +104,22 @@
   table.grid{
     width:100%;
     border-collapse:collapse;
-    font-size:12px;
+    font-size:11px;
   }
   table.grid th{
-    background:#eef1e8;
-    color:var(--green-dark);
-    padding:8px 5px;
-    font-size:11px;
+    background:var(--green-dark);
+    color:#fff;
+    padding:6px 4px;
+    font-size:10px;
     font-weight:700;
     text-align:center;
-    border:1px solid var(--line);
-    border-bottom:2px solid var(--green);
+    border:1px solid var(--green-dark);
+    border-bottom:2px solid var(--amber);
     white-space:nowrap;
   }
   table.grid td{
     border:1px solid var(--line);
-    padding:4px;
+    padding:3px;
     text-align:center;
   }
   table.grid td.date-cell{
@@ -119,12 +128,16 @@
     background:#f7f5ef;
     white-space:nowrap;
   }
+  table.grid input.date-input{
+    color:#b3261e;
+    font-weight:800;
+  }
   table.grid input{
-    padding:6px 4px;
-    font-size:13px;
+    padding:5px 3px;
+    font-size:12px;
     font-weight:700;
     text-align:center;
-    min-width:64px;
+    min-width:58px;
     color:var(--ink);
   }
   .scroll-x{ overflow-x:auto; }
@@ -226,7 +239,7 @@
     </div>
     <div class="grand-total" style="border-top:2px solid var(--green);margin-top:6px;padding-top:10px;font-size:14px;">
       <span>Grand Total — All Eggs Combined</span>
-      <span class="value" id="grand-total-all" style="color:var(--amber);font-size:18px;">0</span>
+      <span class="value" id="grand-total-all" style="color:#b3261e;font-size:18px;">0</span>
     </div>
   </div>
 
@@ -284,7 +297,7 @@ function addRow(){
   const tr = document.createElement("tr");
   tr.id = `row-${i}`;
 
-  let cells = `<td><input type="date" data-i="${i}" data-k="date" style="min-width:120px;"></td>`;
+  let cells = `<td><input type="date" class="date-input" data-i="${i}" data-k="date" style="min-width:120px;"></td>`;
   CATEGORIES.forEach(c=>{
     cells += `<td>
       <input type="number" min="0" data-i="${i}" data-k="${c.k}" oninput="updateTotals()">
@@ -339,16 +352,18 @@ function refreshChart(totals){
       datasets: [{
         data: CATEGORIES.map(c => totals[c.k]),
         backgroundColor: "#3f5d3a",
-        borderRadius: 4,
+        borderRadius: 3,
+        barThickness: 14,
       }]
     },
     options: {
+      indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { font: { size: 9.5, weight: "bold" }, maxRotation: 40, minRotation: 20 } },
-        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        x: { beginAtZero: true, ticks: { font: { size: 9.5 } }, grid: { color: "#e6e3d8" } },
+        y: { ticks: { font: { size: 10, weight: "bold" }, color: "#2b4127" }, grid: { display: false } }
       }
     }
   });
@@ -393,13 +408,20 @@ function generatePDF(){
   const marginR = 30;
 
   doc.setFont("helvetica","bold");
-  doc.setFontSize(14);
-  doc.text("EGG STORAGE TRACKER", pageW/2, 30, {align:"center"});
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("CPL COCONUT PRODUCTS LIMITED — POULTRY DIVISION", pageW/2, 24, {align:"center"});
+  doc.setFontSize(11.5);
+  doc.text("EGG STORAGE TRACKER", pageW/2, 39, {align:"center"});
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(marginL, 46, pageW - marginR, 46);
+  doc.setTextColor(0,0,0);
 
   doc.setFont("helvetica","normal");
   doc.setFontSize(9.5);
-  doc.text(`Name: ${name || "_______________________"}`, marginL, 46);
-  doc.text(`Position: ${position || "_______________________"}`, marginL + 260, 46);
+  doc.text(`Name: ${name || "_______________________"}`, marginL, 60);
+  doc.text(`Position: ${position || "_______________________"}`, marginL + 260, 60);
 
   const head = ["Date"].concat(CATEGORIES.map(c => c.label));
   const columnStyles = { 0: { fontStyle:"bold", halign:"left" } };
@@ -408,13 +430,19 @@ function generatePDF(){
   });
 
   doc.autoTable({
-    startY: 58,
+    startY: 68,
     margin:{left:marginL,right:marginR},
     styles:{ fontSize:6.8, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.4, fontStyle:"bold" },
-    headStyles:{ fillColor:[238,241,232], textColor:[43,65,39], fontStyle:"bold", fontSize:6.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold", fontSize:6.5 },
+    alternateRowStyles:{ fillColor:[237,242,233] },
     head:[head],
     body: rows,
     columnStyles: columnStyles,
+    didParseCell: function(data){
+      if(data.column.index === 0 && data.section === "body"){
+        data.cell.styles.textColor = [179,38,30];
+      }
+    },
   });
 
   let y = doc.lastAutoTable.finalY + 20;
@@ -422,8 +450,9 @@ function generatePDF(){
 
   doc.setFont("helvetica","bold");
   doc.setFontSize(10.5);
-  doc.setTextColor(0,0,0);
+  doc.setTextColor(43,65,39);
   doc.text("TOTALS", marginL, y);
+  doc.setTextColor(0,0,0);
   y += 16;
   doc.setFontSize(9.5);
   CATEGORIES.forEach(c=>{
@@ -436,18 +465,29 @@ function generatePDF(){
   doc.text(`Table Eggs: ${tableEggs}`, marginL, y);
   y += 18;
   doc.setFontSize(11.5);
+  doc.setTextColor(179,38,30);
   doc.text(`GRAND TOTAL — All Eggs Combined: ${grandAll}`, marginL, y);
+  doc.setTextColor(0,0,0);
   y += 20;
 
   const chartCanvas = document.getElementById("egg-chart");
-  const imgW = pageW - marginL - marginR;
-  const imgH = imgW * (chartCanvas.height / chartCanvas.width);
+  const maxImgW = 280;
+  const maxImgH = 200;
+  let imgW = maxImgW;
+  let imgH = imgW * (chartCanvas.height / chartCanvas.width);
+  if(imgH > maxImgH){
+    imgH = maxImgH;
+    imgW = imgH * (chartCanvas.width / chartCanvas.height);
+  }
+  const imgX = marginL;
   if(y + imgH + 20 > 800){ doc.addPage(); y = 40; }
   doc.setFont("helvetica","bold");
   doc.setFontSize(10.5);
+  doc.setTextColor(43,65,39);
   doc.text("Category Totals — Bar Graph", marginL, y);
+  doc.setTextColor(0,0,0);
   y += 8;
-  doc.addImage(chartCanvas.toDataURL("image/png",1.0), "PNG", marginL, y, imgW, imgH);
+  doc.addImage(chartCanvas.toDataURL("image/png",1.0), "PNG", imgX, y, imgW, imgH);
 
   const fname = `Egg_Storage_Tracker_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
