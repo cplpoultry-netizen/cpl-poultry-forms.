@@ -557,6 +557,24 @@ function clearForm(){
   currentCustomer = null;
   addCustomer();
 }
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+if(typeof clearForm === "function"){
+  const _origClearForm = clearForm;
+  clearForm = function(){
+    _origClearForm();
+    formTouched = false;
+  };
+}
 </script>
 </body>
 </html>
