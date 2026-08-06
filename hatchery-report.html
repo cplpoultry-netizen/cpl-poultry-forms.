@@ -281,7 +281,11 @@ function removeBatch(i){
 
 function renderTable(){
   const headerRow = document.getElementById("header-row");
-  headerRow.innerHTML = `<th>Field</th>` + columnOrder.map((i,idx)=>`<th>Batch ${idx+1}</th>`).join("") + `<th></th>`;
+  headerRow.innerHTML = `<th>Field</th>` + columnOrder.map((i,idx)=>{
+    const batchNo = (batchesData[i] && batchesData[i]["batch"]) || "";
+    const label = batchNo ? `Batch ${batchNo}` : `Batch ${idx+1}`;
+    return `<th id="colhead-${i}">${label}</th>`;
+  }).join("") + `<th></th>`;
 
   const tbody = document.querySelector("#batch-table tbody");
   tbody.innerHTML = "";
@@ -295,6 +299,8 @@ function renderTable(){
       const value = (batchesData[i] && batchesData[i][f.k]) || "";
       if(f.type === "readonly"){
         cells += `<td><input type="text" data-i="${i}" data-k="${f.k}" readonly placeholder="—" value="${value}"></td>`;
+      } else if(f.k === "batch"){
+        cells += `<td><input type="text" data-i="${i}" data-k="${f.k}" value="${value}" oninput="onBatchNumberInput(${i})"></td>`;
       } else {
         const handler = (f.k === "fertile" || f.k === "hatchChicks") ? `onFertileOrHatchChange(${i})` : (f.type === "number" ? "refreshAll()" : "onFieldChange()");
         const eventName = f.type === "date" || f.type === "time" || f.type === "text" ? "onchange" : "oninput";
@@ -321,6 +327,15 @@ function renderTable(){
 
 function onFieldChange(){
   syncDomToStore();
+}
+
+function onBatchNumberInput(i){
+  syncDomToStore();
+  const headerEl = document.getElementById(`colhead-${i}`);
+  if(!headerEl) return;
+  const typed = document.querySelector(`[data-i="${i}"][data-k="batch"]`).value;
+  const idx = columnOrder.indexOf(i);
+  headerEl.textContent = typed ? `Batch ${typed}` : `Batch ${idx+1}`;
 }
 
 function val(i,k){
@@ -404,7 +419,7 @@ function generatePDF(){
   doc.setFontSize(14);
   doc.text("HATCHERY RECORD", pageW/2, 26, {align:"center"});
 
-  const head = ["Field"].concat(rows.map((r,idx)=>`Batch ${idx+1}`));
+  const head = ["Field"].concat(rows.map((r,idx)=> r.batch ? `Batch ${r.batch}` : `Batch ${idx+1}`));
   const body = FIELD_ROWS.map(f=>{
     const row = [f.label];
     rows.forEach(r=>{
