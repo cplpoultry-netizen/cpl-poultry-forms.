@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bird Mortality Autopsy Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --red:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
+  .wrap{max-width:820px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
+  }
+  .card h2{
+    font-size:13px;
+    margin:0 0 10px;
+    color:#fff;
+    background:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .card h3{
+    font-size:11.5px;
+    margin:14px 0 8px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.4px;
+    border-bottom:2px solid var(--line);
+    padding-bottom:5px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:140px;}
+  label{ display:block; font-size:10.5px; color:#5a5a4f; margin-bottom:3px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input, select, textarea{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13.5px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:600;
+    font-family:inherit;
+  }
+  textarea{ min-height:52px; resize:vertical; font-weight:400; }
+  input:focus, select:focus, textarea:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  .checkbox-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:6px 10px;
+    margin-bottom:6px;
+  }
+  .checkbox-item{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .checkbox-item input{ width:auto; margin:0; }
+
+  .cause-field select{
+    border:2px solid var(--red);
+    color:var(--red);
+    font-weight:800;
+  }
+  .cause-field label{ color:var(--red); }
+
+  .bird-block{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:12px;
+    margin-bottom:12px;
+    background:#fdfcfa;
+  }
+  .bird-block-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .bird-block-header .title{
+    font-size:12.5px;
+    font-weight:800;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.3px;
+  }
+  .remove-btn{
+    background:none;
+    border:1px solid var(--red);
+    color:var(--red);
+    font-size:11px;
+    font-weight:700;
+    padding:4px 9px;
+    border-radius:5px;
+  }
+  .add-row{
+    margin-top:6px;
+    background:none;
+    border:1px dashed var(--green);
+    color:var(--green-dark);
+    padding:9px 12px;
+    border-radius:6px;
+    font-size:12.5px;
+    font-weight:700;
+    width:100%;
+  }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bird Mortality Autopsy Report</h1>
+  <p>CPL Poultry Division — Customer Diagnostic Service</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Case Details</h2>
+    <div class="row">
+      <div class="field"><label>Report Date</label><input type="date" id="f-report-date"></div>
+      <div class="field"><label>Report No.</label><input type="text" id="f-report-no" placeholder="e.g. AR-0001"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label style="color:var(--red);">Customer Name</label><input type="text" id="f-customer" style="color:var(--red);font-weight:800;"></div>
+      <div class="field"><label>Farm / Location</label><input type="text" id="f-farm"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Contact Number</label><input type="text" id="f-contact"></div>
+      <div class="field"><label>Batch / Hatchery Source Ref.</label><input type="text" id="f-batchref" placeholder="e.g. Batch 14"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Date Birds Received by Customer</label><input type="date" id="f-date-received"></div>
+      <div class="field"><label>Age of Flock at Time of Death (days)</label><input type="number" min="0" id="f-flock-age"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Total Birds Died</label><input type="number" min="0" id="f-total-died" style="color:var(--red);font-weight:800;"></div>
+    </div>
+  </div>
+
+  <div id="birds-container"></div>
+
+  <button class="add-row" onclick="addBird()">+ Add another bird examined</button>
+
+  <div class="card">
+    <h2>Overall Assessment</h2>
+    <div class="field" style="margin-bottom:8px;">
+      <label>Contributing / Management Factors</label>
+      <textarea id="f-factors" placeholder="e.g. brooder temperature, overcrowding, water access, transport stress, feed change"></textarea>
+    </div>
+    <div class="field">
+      <label>Recommendations to Customer</label>
+      <textarea id="f-recommendations" placeholder="e.g. adjust brooder temperature to X°C, review water access, consult a vet for treatment"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Examined By</h2>
+    <div class="row">
+      <div class="field"><label>Name</label><input type="text" id="f-examiner-name" placeholder="e.g. Robert Wartovo"></div>
+      <div class="field"><label>Position</label><input type="text" id="f-examiner-position" placeholder="e.g. Poultry Supervisor"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Date Examined</label><input type="date" id="f-examined-date"></div>
+      <div class="field"><label>Signature (initials)</label><input type="text" id="f-signature" placeholder="e.g. R.W"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const SYMPTOMS = [
+  "Lethargy / Weakness",
+  "Loss of Appetite",
+  "Diarrhea / Pasty Vent",
+  "Respiratory Distress",
+  "Swollen Abdomen",
+  "Trembling / Nervous Signs",
+  "Leg / Joint Problems",
+  "Sudden Death (No Prior Signs)",
+];
+
+const CAUSES = [
+  "",
+  "Omphalitis (Yolk Sac Infection)",
+  "Dehydration",
+  "Starvation",
+  "Chilling / Hypothermia",
+  "Overheating / Heat Stress",
+  "Bacterial Infection",
+  "Viral Infection",
+  "Coccidiosis",
+  "Nutritional Deficiency",
+  "Suffocation / Smothering",
+  "Trauma / Injury",
+  "Undetermined",
+  "Other",
+];
+
+let birdCount = 0;
+
+function selectOptions(options, selectedValue){
+  return options.map(o => `<option value="${o}" ${o===selectedValue?"selected":""}>${o || "Select..."}</option>`).join("");
+}
+
+function addBird(){
+  const container = document.getElementById("birds-container");
+  const i = birdCount++;
+  const card = document.createElement("div");
+  card.className = "card bird-block";
+  card.id = `bird-${i}`;
+
+  const symptomBoxes = SYMPTOMS.map((s, si) => `
+    <label class="checkbox-item">
+      <input type="checkbox" data-i="${i}" data-symptom="${si}">
+      ${s}
+    </label>
+  `).join("");
+
+  card.innerHTML = `
+    <div class="bird-block-header">
+      <span class="title">Bird ${i+1}</span>
+      <button class="remove-btn" onclick="removeBird(${i})">✕ Remove</button>
+    </div>
+
+    <div class="row">
+      <div class="field"><label>Bird ID / Tag</label><input type="text" data-i="${i}" data-k="tag" placeholder="optional"></div>
+      <div class="field"><label style="color:var(--red);">Date of Death</label><input type="date" data-i="${i}" data-k="dateOfDeath" style="color:var(--red);font-weight:800;"></div>
+      <div class="field"><label>Time of Death</label><input type="time" data-i="${i}" data-k="timeOfDeath"></div>
+    </div>
+
+    <h3>Symptoms Observed (as reported)</h3>
+    <div class="checkbox-grid">${symptomBoxes}</div>
+    <div class="field"><label>Other Symptoms</label><input type="text" data-i="${i}" data-k="symptomsOther"></div>
+
+    <h3>External Examination</h3>
+    <div class="row">
+      <div class="field">
+        <label>Body Condition</label>
+        <select data-i="${i}" data-k="bodyCondition">
+          ${selectOptions(["","Normal","Emaciated","Dehydrated","Bloated"], "")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Navel / Yolk Sac (external)</label>
+        <select data-i="${i}" data-k="navelExternal">
+          ${selectOptions(["","Normal / Healed","Unhealed / Open","Inflamed / Infected"], "")}
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>External Wounds / Lesions</label><input type="text" data-i="${i}" data-k="externalWounds"></div>
+
+    <h3>Internal Examination</h3>
+    <div class="row">
+      <div class="field">
+        <label>Yolk Sac (internal)</label>
+        <select data-i="${i}" data-k="yolkSac">
+          ${selectOptions(["","Fully Absorbed","Partially Absorbed","Unabsorbed / Infected"], "")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Liver</label>
+        <select data-i="${i}" data-k="liver">
+          ${selectOptions(["","Normal","Enlarged","Pale","Hemorrhagic"], "")}
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Heart</label>
+        <select data-i="${i}" data-k="heart">
+          ${selectOptions(["","Normal","Enlarged","Pale"], "")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Lungs / Air Sacs</label>
+        <select data-i="${i}" data-k="lungs">
+          ${selectOptions(["","Normal","Congested","Cloudy / Infected"], "")}
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Intestines</label>
+        <select data-i="${i}" data-k="intestines">
+          ${selectOptions(["","Normal","Inflamed","Hemorrhagic"], "")}
+        </select>
+      </div>
+      <div class="field"><label>Other Internal Findings</label><input type="text" data-i="${i}" data-k="otherFindings"></div>
+    </div>
+
+    <h3>Diagnosis</h3>
+    <div class="field cause-field">
+      <label>Probable Cause of Death</label>
+      <select data-i="${i}" data-k="cause">
+        ${selectOptions(CAUSES, "")}
+      </select>
+    </div>
+    <div class="field" style="margin-top:8px;"><label>Remarks</label><input type="text" data-i="${i}" data-k="remarks"></div>
+  `;
+  container.appendChild(card);
+}
+
+function removeBird(i){
+  const card = document.getElementById(`bird-${i}`);
+  if(card) card.remove();
+}
+
+addBird();
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function val(sel){
+  const el = document.querySelector(sel);
+  return el ? el.value : "";
+}
+
+function collectBirds(){
+  const cards = document.querySelectorAll(".bird-block");
+  const birds = [];
+  cards.forEach(card=>{
+    const i = card.id.replace("bird-","");
+    const symptoms = [];
+    SYMPTOMS.forEach((s, si)=>{
+      const box = document.querySelector(`[data-i="${i}"][data-symptom="${si}"]`);
+      if(box && box.checked) symptoms.push(s);
+    });
+    const other = val(`[data-i="${i}"][data-k="symptomsOther"]`);
+    if(other) symptoms.push(other);
+
+    birds.push({
+      tag: val(`[data-i="${i}"][data-k="tag"]`),
+      dateOfDeath: val(`[data-i="${i}"][data-k="dateOfDeath"]`),
+      timeOfDeath: val(`[data-i="${i}"][data-k="timeOfDeath"]`),
+      symptoms: symptoms.join(", "),
+      bodyCondition: val(`[data-i="${i}"][data-k="bodyCondition"]`),
+      navelExternal: val(`[data-i="${i}"][data-k="navelExternal"]`),
+      externalWounds: val(`[data-i="${i}"][data-k="externalWounds"]`),
+      yolkSac: val(`[data-i="${i}"][data-k="yolkSac"]`),
+      liver: val(`[data-i="${i}"][data-k="liver"]`),
+      heart: val(`[data-i="${i}"][data-k="heart"]`),
+      lungs: val(`[data-i="${i}"][data-k="lungs"]`),
+      intestines: val(`[data-i="${i}"][data-k="intestines"]`),
+      otherFindings: val(`[data-i="${i}"][data-k="otherFindings"]`),
+      cause: val(`[data-i="${i}"][data-k="cause"]`),
+      remarks: val(`[data-i="${i}"][data-k="remarks"]`),
+    });
+  });
+  return birds;
+}
+
+function generatePDF(){
+  const birds = collectBirds();
+  const reportDate = document.getElementById("f-report-date").value;
+  const reportNo = document.getElementById("f-report-no").value;
+  const customer = document.getElementById("f-customer").value;
+  const farm = document.getElementById("f-farm").value;
+  const contact = document.getElementById("f-contact").value;
+  const batchRef = document.getElementById("f-batchref").value;
+  const dateReceived = document.getElementById("f-date-received").value;
+  const flockAge = document.getElementById("f-flock-age").value;
+  const totalDied = document.getElementById("f-total-died").value;
+  const factors = document.getElementById("f-factors").value;
+  const recommendations = document.getElementById("f-recommendations").value;
+  const examinerName = document.getElementById("f-examiner-name").value;
+  const examinerPosition = document.getElementById("f-examiner-position").value;
+  const examinedDate = document.getElementById("f-examined-date").value;
+  const signature = document.getElementById("f-signature").value;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginL = 34;
+  const marginR = 34;
+  let y = 24;
+
+  function ensureSpace(next){
+    if(y + next > pageH - 30){
+      doc.addPage();
+      y = 30;
+    }
+  }
+
+  function sectionTitle(text){
+    ensureSpace(24);
+    doc.setFillColor(47,72,45);
+    doc.rect(marginL, y, pageW - marginL - marginR, 18, "F");
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(255,255,255);
+    doc.text(text, marginL + 8, y + 13);
+    doc.setTextColor(0,0,0);
+    y += 26;
+  }
+
+  function fieldLine(label, value, opts){
+    opts = opts || {};
+    ensureSpace(14);
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(90,90,79);
+    doc.text(label.toUpperCase(), marginL, y);
+    y += 11;
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(opts.red ? 179 : 31, opts.red ? 38 : 42, opts.red ? 30 : 33);
+    const lines = doc.splitTextToSize(value || "—", pageW - marginL - marginR);
+    doc.text(lines, marginL, y);
+    y += (lines.length * 11) + 6;
+    doc.setTextColor(0,0,0);
+  }
+
+  // ---- Letterhead ----
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("CPL COCONUT PRODUCTS LIMITED — POULTRY DIVISION", pageW/2, y, {align:"center"});
+  y += 15;
+  doc.setFontSize(12);
+  doc.text("BIRD MORTALITY AUTOPSY REPORT", pageW/2, y, {align:"center"});
+  y += 7;
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(marginL, y, pageW - marginR, y);
+  doc.setTextColor(0,0,0);
+  y += 16;
+
+  // ---- Case Details ----
+  sectionTitle("CASE DETAILS");
+  doc.autoTable({
+    startY: y,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:8.5, cellPadding:3.5, lineColor:[180,180,170], lineWidth:0.4 },
+    theme:"grid",
+    body:[
+      ["Report Date", fmtDate(reportDate) || "—", "Report No.", reportNo || "—"],
+      ["Customer Name", customer || "—", "Farm / Location", farm || "—"],
+      ["Contact Number", contact || "—", "Batch / Source Ref.", batchRef || "—"],
+      ["Date Received", fmtDate(dateReceived) || "—", "Flock Age at Death", flockAge ? `${flockAge} days` : "—"],
+      ["Total Birds Died", totalDied || "—", "", ""],
+    ],
+    columnStyles:{
+      0:{ fontStyle:"bold", textColor:[43,65,39], fillColor:[237,242,233], cellWidth:100 },
+      2:{ fontStyle:"bold", textColor:[43,65,39], fillColor:[237,242,233], cellWidth:100 },
+    },
+    didParseCell: function(data){
+      if(data.row.index === 1 && data.column.index === 1){
+        data.cell.styles.textColor = [179,38,30];
+        data.cell.styles.fontStyle = "bold";
+      }
+      if(data.row.index === 4){
+        if(data.column.index === 1){
+          data.cell.styles.textColor = [179,38,30];
+          data.cell.styles.fontStyle = "bold";
+        }
+        if(data.column.index === 2 || data.column.index === 3){
+          data.cell.styles.fillColor = [255,255,255];
+        }
+      }
+    },
+  });
+  // Merge the empty trailing cells on the Total Birds Died row so it reads cleanly
+  y = doc.lastAutoTable.finalY + 16;
+
+  // ---- Each bird examined ----
+  birds.forEach((c, idx)=>{
+    ensureSpace(30);
+    sectionTitle(`BIRD ${idx+1} EXAMINED${c.tag ? " — " + c.tag : ""}`);
+
+    doc.autoTable({
+      startY: y,
+      margin:{left:marginL,right:marginR},
+      styles:{ fontSize:8.5, cellPadding:3.5, lineColor:[180,180,170], lineWidth:0.4 },
+      theme:"grid",
+      body:[
+        ["Date of Death", fmtDate(c.dateOfDeath) || "—", "Time of Death", c.timeOfDeath || "—"],
+      ],
+      columnStyles:{
+        0:{ fontStyle:"bold", textColor:[43,65,39], fillColor:[237,242,233], cellWidth:100 },
+        2:{ fontStyle:"bold", textColor:[43,65,39], fillColor:[237,242,233], cellWidth:100 },
+      },
+      didParseCell: function(data){
+        if(data.row.index === 0 && data.column.index === 1){
+          data.cell.styles.textColor = [179,38,30];
+          data.cell.styles.fontStyle = "bold";
+        }
+      },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+
+    fieldLine("Symptoms Observed", c.symptoms);
+
+    doc.autoTable({
+      startY: y,
+      margin:{left:marginL,right:marginR},
+      styles:{ fontSize:8.5, cellPadding:3.5, lineColor:[180,180,170], lineWidth:0.4 },
+      theme:"grid",
+      head:[["External Examination","Finding"]],
+      headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+      body:[
+        ["Body Condition", c.bodyCondition || "—"],
+        ["Navel / Yolk Sac (external)", c.navelExternal || "—"],
+        ["External Wounds / Lesions", c.externalWounds || "—"],
+      ],
+      columnStyles:{ 0:{ fontStyle:"bold", cellWidth:180 } },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+
+    doc.autoTable({
+      startY: y,
+      margin:{left:marginL,right:marginR},
+      styles:{ fontSize:8.5, cellPadding:3.5, lineColor:[180,180,170], lineWidth:0.4 },
+      theme:"grid",
+      head:[["Internal Examination","Finding"]],
+      headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+      body:[
+        ["Yolk Sac (internal)", c.yolkSac || "—"],
+        ["Liver", c.liver || "—"],
+        ["Heart", c.heart || "—"],
+        ["Lungs / Air Sacs", c.lungs || "—"],
+        ["Intestines", c.intestines || "—"],
+        ["Other Internal Findings", c.otherFindings || "—"],
+      ],
+      columnStyles:{ 0:{ fontStyle:"bold", cellWidth:180 } },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+
+    fieldLine("Probable Cause of Death", c.cause, { bold:true, red:true });
+    fieldLine("Remarks", c.remarks);
+    y += 4;
+  });
+
+  // ---- Overall Assessment ----
+  sectionTitle("OVERALL ASSESSMENT");
+  fieldLine("Contributing / Management Factors", factors);
+  fieldLine("Recommendations to Customer", recommendations);
+
+  // ---- Examined By ----
+  ensureSpace(60);
+  sectionTitle("EXAMINED BY");
+  doc.autoTable({
+    startY: y,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:8.5, cellPadding:3.5, lineColor:[180,180,170], lineWidth:0.4 },
+    theme:"grid",
+    body:[
+      ["Name", examinerName || "_______________________", "Position", examinerPosition || "_______________________"],
+      ["Date Examined", fmtDate(examinedDate) || "_______________________", "Signature", signature || "_______________________"],
+    ],
+    columnStyles:{
+      0:{ fontStyle:"bold", textColor:[43,65,39], fillColor:[237,242,233], cellWidth:100 },
+      2:{ fontStyle:"bold", textColor:[43,65,39], fillColor:[237,242,233], cellWidth:100 },
+    },
+  });
+
+  const fname = `Bird_Mortality_Autopsy_${reportNo || reportDate || "draft"}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.getElementById("birds-container").innerHTML = "";
+  birdCount = 0;
+  addBird();
+  ["f-report-date","f-report-no","f-customer","f-farm","f-contact","f-batchref",
+   "f-date-received","f-flock-age","f-total-died","f-factors","f-recommendations",
+   "f-examiner-name","f-examiner-position","f-examined-date","f-signature"
+  ].forEach(id=>{ document.getElementById(id).value = ""; });
+}
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+if(typeof clearForm === "function"){
+  const _origClearForm = clearForm;
+  clearForm = function(){
+    _origClearForm();
+    formTouched = false;
+  };
+}
+</script>
+</body>
+</html>
