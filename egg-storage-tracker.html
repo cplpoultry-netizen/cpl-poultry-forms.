@@ -254,6 +254,7 @@
 <script>
 const CATEGORIES = [
   { k:"minorCrack", label:"Minor Crack Eggs" },
+  { k:"smashed", label:"Smashed Eggs" },
   { k:"small", label:"Small Eggs" },
   { k:"medium", label:"Medium Eggs" },
   { k:"large", label:"Large Eggs" },
@@ -335,7 +336,7 @@ function updateTotals(){
     grandAll += totals[c.k];
   });
 
-  const tableEggs = totals.minorCrack + totals.small + totals.medium + totals.large + totals.extraLarge + totals.missShaped + totals.tinShells + totals.dirty + totals.brown;
+  const tableEggs = totals.minorCrack + totals.smashed + totals.small + totals.medium + totals.large + totals.extraLarge + totals.missShaped + totals.tinShells + totals.dirty + totals.brown;
   document.getElementById("total-tableEggs").textContent = tableEggs;
   document.getElementById("grand-total-all").textContent = grandAll;
 
