@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Egg Grading Percentage Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --red:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:16.5px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
+  .wrap{max-width:1000px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
+  }
+  .card h2{
+    font-size:13px;
+    margin:0 0 10px;
+    color:#fff;
+    background:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:140px;}
+  label{ display:block; font-size:10.5px; color:#5a5a4f; margin-bottom:3px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13.5px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:600;
+  }
+  input[readonly]{ background:#f0efe8; color:var(--green-dark); }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+  table.grid th{
+    background:var(--green-dark);
+    color:#fff;
+    padding:8px 6px;
+    font-size:10.5px;
+    font-weight:700;
+    text-align:center;
+    border:1px solid var(--green-dark);
+    border-bottom:2px solid var(--amber);
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:6px;
+    text-align:center;
+  }
+  table.grid td.category{
+    text-align:left;
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+  }
+  table.grid input{
+    padding:6px 4px;
+    font-size:12.5px;
+    text-align:center;
+    min-width:64px;
+  }
+  td.total-cell input{
+    background:#f0efe8;
+    color:var(--green-dark);
+    font-weight:800;
+  }
+  td.pct-cell input{
+    background:#fbeceb;
+    color:var(--red);
+    font-weight:800;
+  }
+  tr.grand-row td{
+    background:#eef1e8;
+    font-weight:800;
+    color:var(--green-dark);
+  }
+  tr.grand-row td.pct-cell{
+    background:#fbeceb;
+    color:var(--red);
+  }
+  .scroll-x{ overflow-x:auto; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:6px; }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Egg Grading Percentage Tracker</h1>
+  <p>CPL Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Record Details</h2>
+    <div class="row">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Recorded By</label><input type="text" id="f-name" placeholder="e.g. Robert Wartovo"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Grading Counts — 9:00 AM / 12:00 PM / 4:00 PM</h2>
+    <div class="scroll-x">
+      <table class="grid" id="grading-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>9:00 AM</th>
+            <th>12:00 PM</th>
+            <th>4:00 PM</th>
+            <th>Total</th>
+            <th>Percentage</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+    <p class="hint">Enter each category's count for every time slot — Total and Percentage fill in automatically as you type. Percentage = that category's total ÷ grand total of all categories × 100.</p>
+  </div>
+
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const CATEGORIES = [
+  { k:"minorCrack", label:"Minor Crack" },
+  { k:"small", label:"Small" },
+  { k:"damage", label:"Damage" },
+  { k:"missShaped", label:"Miss Shaped" },
+  { k:"thinShells", label:"Thin Shells" },
+  { k:"dirty", label:"Dirty" },
+  { k:"extraLarge", label:"Extra Large" },
+  { k:"clean", label:"Clean" },
+];
+
+function buildTable(){
+  const tbody = document.querySelector("#grading-table tbody");
+  CATEGORIES.forEach(c=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="category">${c.label}</td>
+      <td><input type="number" min="0" data-k="${c.k}" data-slot="am9" oninput="updateAll()"></td>
+      <td><input type="number" min="0" data-k="${c.k}" data-slot="pm12" oninput="updateAll()"></td>
+      <td><input type="number" min="0" data-k="${c.k}" data-slot="pm4" oninput="updateAll()"></td>
+      <td class="total-cell"><input type="text" id="total-${c.k}" readonly></td>
+      <td class="pct-cell"><input type="text" id="pct-${c.k}" readonly></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const tfoot = document.querySelector("#grading-table tfoot");
+  tfoot.innerHTML = `
+    <tr class="grand-row">
+      <td class="category">GRAND TOTAL</td>
+      <td id="grand-am9">0</td>
+      <td id="grand-pm12">0</td>
+      <td id="grand-pm4">0</td>
+      <td id="grand-total">0</td>
+      <td class="pct-cell">100.0%</td>
+    </tr>
+  `;
+}
+
+function val(k, slot){
+  const el = document.querySelector(`[data-k="${k}"][data-slot="${slot}"]`);
+  return parseFloat(el.value) || 0;
+}
+
+function updateAll(){
+  let grandAm9 = 0, grandPm12 = 0, grandPm4 = 0, grandTotal = 0;
+  const rowTotals = {};
+
+  CATEGORIES.forEach(c=>{
+    const am9 = val(c.k, "am9");
+    const pm12 = val(c.k, "pm12");
+    const pm4 = val(c.k, "pm4");
+    const total = am9 + pm12 + pm4;
+    rowTotals[c.k] = total;
+    document.getElementById(`total-${c.k}`).value = total;
+    grandAm9 += am9;
+    grandPm12 += pm12;
+    grandPm4 += pm4;
+    grandTotal += total;
+  });
+
+  CATEGORIES.forEach(c=>{
+    const pct = grandTotal > 0 ? (rowTotals[c.k] / grandTotal * 100) : 0;
+    document.getElementById(`pct-${c.k}`).value = pct.toFixed(1) + "%";
+  });
+
+  document.getElementById("grand-am9").textContent = grandAm9;
+  document.getElementById("grand-pm12").textContent = grandPm12;
+  document.getElementById("grand-pm4").textContent = grandPm4;
+  document.getElementById("grand-total").textContent = grandTotal;
+}
+
+buildTable();
+updateAll();
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function generatePDF(){
+  const date = document.getElementById("f-date").value;
+  const name = document.getElementById("f-name").value;
+
+  const body = CATEGORIES.map(c=>{
+    const am9 = val(c.k, "am9");
+    const pm12 = val(c.k, "pm12");
+    const pm4 = val(c.k, "pm4");
+    const total = document.getElementById(`total-${c.k}`).value;
+    const pct = document.getElementById(`pct-${c.k}`).value;
+    return [c.label, am9, pm12, pm4, total, pct];
+  });
+  body.push([
+    "GRAND TOTAL",
+    document.getElementById("grand-am9").textContent,
+    document.getElementById("grand-pm12").textContent,
+    document.getElementById("grand-pm4").textContent,
+    document.getElementById("grand-total").textContent,
+    "100.0%",
+  ]);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 34;
+  const marginR = 34;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("CPL COCONUT PRODUCTS LIMITED — POULTRY DIVISION", pageW/2, 24, {align:"center"});
+  doc.setFontSize(11.5);
+  doc.text("EGG GRADING PERCENTAGE TRACKER", pageW/2, 39, {align:"center"});
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(marginL, 46, pageW - marginR, 46);
+  doc.setTextColor(0,0,0);
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Date: ${fmtDate(date) || "_______________________"}`, marginL, 60);
+  doc.text(`Recorded By: ${name || "_______________________"}`, marginL + 260, 60);
+
+  doc.autoTable({
+    startY: 72,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:9.5, cellPadding:6, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["Category","9:00 AM","12:00 PM","4:00 PM","Total","Percentage"]],
+    body: body,
+    columnStyles:{ 0:{halign:"left",fontStyle:"bold"}, 5:{textColor:[179,38,30],fontStyle:"bold"} },
+    didParseCell: function(data){
+      if(data.row.index === body.length - 1){
+        data.cell.styles.fillColor = [237,242,233];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+  });
+
+  const fname = `Egg_Grading_Percentage_${date || "draft"}.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.querySelectorAll("#grading-table tbody input").forEach(i=>{ i.value = ""; });
+  document.getElementById("f-date").value = "";
+  document.getElementById("f-name").value = "";
+  updateAll();
+}
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+if(typeof clearForm === "function"){
+  const _origClearForm = clearForm;
+  clearForm = function(){
+    _origClearForm();
+    formTouched = false;
+  };
+}
+</script>
+</body>
+</html>
