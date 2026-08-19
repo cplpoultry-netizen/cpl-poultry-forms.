@@ -545,7 +545,8 @@ function generatePDF(){
   doc.text(`GRAND TOTAL (All Customers): K${grandAllCustomers.toFixed(2)}`, marginL, y);
   doc.setTextColor(0,0,0);
 
-  const fname = `Poultry_Sales_${new Date().toISOString().slice(0,10)}.pdf`;
+  const todayNice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  const fname = `${todayNice} Poultry Sales.pdf`;
   doc.save(fname);
 }
 

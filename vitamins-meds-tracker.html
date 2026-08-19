@@ -350,7 +350,7 @@ function generatePDF(){
   doc.text(`Staff Signature: ${sig || "_______________________"}`, marginL, y);
   doc.text(`Date Submitted: ${fmtDate(submitted) || "_______________________"}`, marginL + 280, y);
 
-  const fname = `Vitamins_Meds_Tracker_${MONTH_NAMES[month-1]}_${year}.pdf`;
+  const fname = `${MONTH_NAMES[month-1]} ${year} Vitamins Meds Tracker.pdf`;
   doc.save(fname);
 }
 

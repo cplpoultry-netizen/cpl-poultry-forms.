@@ -566,7 +566,7 @@ function generatePDF(){
   y += 8;
   doc.addImage(chartCanvas.toDataURL("image/png",1.0), "PNG", marginL, y, imgW, imgH);
 
-  const fname = `Poultry_Attendance_Week${currentWeek}_${w ? w.date : "draft"}.pdf`;
+  const fname = `Week ${currentWeek} ${w ? fmtDate(w.date).replace(/\//g," ") : "Draft"} Poultry Attendance.pdf`;
   doc.save(fname);
 }
 

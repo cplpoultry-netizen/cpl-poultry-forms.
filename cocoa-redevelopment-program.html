@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cocoa Re-development Program</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --red:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:40px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:16.5px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
+  .wrap{max-width:960px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
+  }
+  .card h2{
+    font-size:13px;
+    margin:0 0 10px;
+    color:#fff;
+    background:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+  }
+  .card h3{
+    font-size:12px;
+    margin:16px 0 8px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.4px;
+    border-bottom:2px solid var(--line);
+    padding-bottom:5px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:140px;}
+  label{ display:block; font-size:10.5px; color:#5a5a4f; margin-bottom:3px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13.5px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:600;
+  }
+  input[readonly]{ background:#f0efe8; color:var(--green-dark); }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+  table.grid th{
+    background:var(--green-dark);
+    color:#fff;
+    padding:8px 6px;
+    font-size:10.5px;
+    font-weight:700;
+    text-align:center;
+    border:1px solid var(--green-dark);
+    border-bottom:2px solid var(--amber);
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:6px;
+    text-align:center;
+  }
+  table.grid td.activity{
+    text-align:left;
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+  }
+  table.grid input[type="checkbox"]{
+    width:20px;
+    height:20px;
+    cursor:pointer;
+  }
+  table.grid input[type="text"], table.grid input[type="date"]{
+    padding:6px 4px;
+    font-size:12px;
+    text-align:center;
+    min-width:90px;
+  }
+  .scroll-x{ overflow-x:auto; }
+
+  .week-block{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:12px;
+    margin-bottom:12px;
+    background:#fdfcfa;
+  }
+  .week-block .title{
+    font-size:12px;
+    font-weight:800;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    margin-bottom:8px;
+  }
+  .total-box{
+    background:#f0efe8;
+    color:var(--green-dark);
+    font-weight:800;
+  }
+
+  .section-btn{
+    margin-top:10px;
+    background:var(--amber);
+    color:#fff;
+    border:none;
+    padding:11px 14px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-weight:700;
+    width:100%;
+  }
+  .clear-btn{
+    margin-top:24px;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:11px 14px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-weight:700;
+    width:100%;
+  }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>2026 CPL Cocoa Re-development Program</h1>
+  <p>Cocoa Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Program Details</h2>
+    <div class="row">
+      <div class="field"><label>Block / Location</label><input type="text" id="f-block" placeholder="e.g. Block 4"></div>
+      <div class="field"><label>Supervisor</label><input type="text" id="f-supervisor"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Cocoa Husbandry Management</h2>
+    <div class="scroll-x">
+      <table class="grid" id="husbandry-table">
+        <thead>
+          <tr><th>No.</th><th>Activity</th><th>Tick</th><th>Date Completed</th><th>Remarks</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="section-btn" onclick="generateChecklistPDF('husbandry')">Generate PDF — Cocoa Husbandry Management</button>
+  </div>
+
+  <div class="card">
+    <h2>Up Keep Management</h2>
+    <div class="scroll-x">
+      <table class="grid" id="upkeep-table">
+        <thead>
+          <tr><th>No.</th><th>Activity</th><th>Tick</th><th>Date Completed</th><th>Remarks</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="section-btn" onclick="generateChecklistPDF('upkeep')">Generate PDF — Up Keep Management</button>
+  </div>
+
+  <div class="card">
+    <h2>Weekly Records</h2>
+    <div class="row">
+      <div class="field"><label>Present Date</label><input type="text" id="f-present-date" readonly></div>
+      <div class="field"><label>Week Number</label><input type="number" min="1" id="f-week-number" placeholder="e.g. 32"></div>
+    </div>
+
+    <div class="week-block">
+      <div class="title">Planting</div>
+      <div class="row">
+        <div class="field"><label>Number of Planting</label><input type="number" min="0" data-w="main" data-k="planting" oninput="updateWeekTotal('main')"></div>
+        <div class="field"><label>Number of Seedlings</label><input type="number" min="0" data-w="main" data-k="seedlings" oninput="updateWeekTotal('main')"></div>
+        <div class="field"><label>Total Planting Per Week</label><input type="text" data-w="main" data-k="total" readonly class="total-box"></div>
+      </div>
+    </div>
+
+    <h3>1. Under Planting</h3>
+    <div class="week-block">
+      <div class="row">
+        <div class="field"><label>Number of Planting</label><input type="number" min="0" data-w="under" data-k="planting" oninput="updateWeekTotal('under')"></div>
+        <div class="field"><label>Number of Seedlings</label><input type="number" min="0" data-w="under" data-k="seedlings" oninput="updateWeekTotal('under')"></div>
+        <div class="field"><label>Total Planting Per Week</label><input type="text" data-w="under" data-k="total" readonly class="total-box"></div>
+      </div>
+    </div>
+
+    <h3>2. Replacement (Re-supplying)</h3>
+    <div class="week-block">
+      <div class="row">
+        <div class="field"><label>Number of Planting</label><input type="number" min="0" data-w="replacement" data-k="planting" oninput="updateWeekTotal('replacement')"></div>
+        <div class="field"><label>Number of Seedlings</label><input type="number" min="0" data-w="replacement" data-k="seedlings" oninput="updateWeekTotal('replacement')"></div>
+        <div class="field"><label>Total Planting Per Week</label><input type="text" data-w="replacement" data-k="total" readonly class="total-box"></div>
+      </div>
+    </div>
+
+    <h3>3. Infilling</h3>
+    <div class="week-block">
+      <div class="row">
+        <div class="field"><label>Number of Planting</label><input type="number" min="0" data-w="infilling" data-k="planting" oninput="updateWeekTotal('infilling')"></div>
+        <div class="field"><label>Number of Seedlings</label><input type="number" min="0" data-w="infilling" data-k="seedlings" oninput="updateWeekTotal('infilling')"></div>
+        <div class="field"><label>Total Planting Per Week</label><input type="text" data-w="infilling" data-k="total" readonly class="total-box"></div>
+      </div>
+    </div>
+
+    <button class="section-btn" onclick="generateWeeklyPDF()">Generate PDF — Weekly Records</button>
+  </div>
+
+  <button class="clear-btn" onclick="clearForm()">Clear Everything</button>
+
+</div>
+
+<script>
+const HUSBANDRY_ITEMS = [
+  "Slashing",
+  "Lining",
+  "Plant Spacing & Row Spacing",
+  "Pegging",
+  "Pre-weeding",
+  "Planting Holes",
+  "Actual Planting",
+];
+
+const UPKEEP_ITEMS = [
+  "Creepers Sanitation",
+  "Pruning",
+  "Ring Weeding (Post Weeding)",
+  "Black Pod Harvesting",
+  "Knapsack Spraying",
+  "Fertilizer Application",
+];
+
+function buildChecklist(tableId, items){
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  items.forEach((item, i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td class="activity">${item}</td>
+      <td><input type="checkbox" data-tick="${i}"></td>
+      <td><input type="date" data-date="${i}"></td>
+      <td><input type="text" data-remarks="${i}"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+buildChecklist("husbandry-table", HUSBANDRY_ITEMS);
+buildChecklist("upkeep-table", UPKEEP_ITEMS);
+
+function setPresentDate(){
+  const today = new Date();
+  const d = String(today.getDate()).padStart(2,"0");
+  const m = String(today.getMonth()+1).padStart(2,"0");
+  const y = today.getFullYear();
+  document.getElementById("f-present-date").value = `${d}/${m}/${y}`;
+}
+setPresentDate();
+
+function updateWeekTotal(w){
+  const planting = parseFloat(document.querySelector(`[data-w="${w}"][data-k="planting"]`).value) || 0;
+  const seedlings = parseFloat(document.querySelector(`[data-w="${w}"][data-k="seedlings"]`).value) || 0;
+  document.querySelector(`[data-w="${w}"][data-k="total"]`).value = planting + seedlings;
+}
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function letterhead(doc, pageW, subtitle){
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("2026 CPL COCOA RE-DEVELOPMENT PROGRAM", pageW/2, 28, {align:"center"});
+  doc.setFontSize(12);
+  doc.text(subtitle, pageW/2, 45, {align:"center"});
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(34, 54, pageW - 34, 54);
+  doc.setTextColor(0,0,0);
+}
+
+function generateChecklistPDF(section){
+  const items = section === "husbandry" ? HUSBANDRY_ITEMS : UPKEEP_ITEMS;
+  const title = section === "husbandry" ? "Cocoa Husbandry Management Checklist" : "Up Keep Management Checklist";
+  const block = document.getElementById("f-block").value;
+  const supervisor = document.getElementById("f-supervisor").value;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 34;
+  const marginR = 34;
+
+  letterhead(doc, pageW, title.toUpperCase());
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Block / Location: ${block || "_______________________"}`, marginL, 70);
+  doc.text(`Supervisor: ${supervisor || "_______________________"}`, marginL + 260, 70);
+
+  const body = items.map((item, i)=>{
+    const tick = document.querySelector(`#${section}-table [data-tick="${i}"]`).checked ? "YES" : "";
+    const date = fmtDate(document.querySelector(`#${section}-table [data-date="${i}"]`).value);
+    const remarks = document.querySelector(`#${section}-table [data-remarks="${i}"]`).value;
+    return [i+1, item, tick, date || "—", remarks || "—"];
+  });
+
+  doc.autoTable({
+    startY: 84,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:9.5, cellPadding:7, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["No.","Activity","Completed","Date","Remarks"]],
+    body: body,
+    columnStyles:{ 1:{halign:"left",fontStyle:"bold"}, 2:{textColor:[179,38,30],fontStyle:"bold"}, 4:{halign:"left"} },
+  });
+
+  const todayNice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  const fname = `${todayNice} ${section === "husbandry" ? "Cocoa Husbandry Management" : "Up Keep Management"}.pdf`;
+  doc.save(fname);
+}
+
+function generateWeeklyPDF(){
+  const block = document.getElementById("f-block").value;
+  const supervisor = document.getElementById("f-supervisor").value;
+  const presentDate = document.getElementById("f-present-date").value;
+  const weekNumber = document.getElementById("f-week-number").value;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 34;
+  const marginR = 34;
+
+  letterhead(doc, pageW, "WEEKLY PLANTING RECORDS");
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Block / Location: ${block || "_______________________"}`, marginL, 70);
+  doc.text(`Supervisor: ${supervisor || "_______________________"}`, marginL + 260, 70);
+
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(179,38,30);
+  doc.text(`Week Number: ${weekNumber || "____"}`, marginL, 86);
+  doc.text(`Present Date: ${presentDate}`, marginL + 200, 86);
+  doc.setTextColor(0,0,0);
+
+  function weekRow(w){
+    const planting = document.querySelector(`[data-w="${w}"][data-k="planting"]`).value || "0";
+    const seedlings = document.querySelector(`[data-w="${w}"][data-k="seedlings"]`).value || "0";
+    const total = document.querySelector(`[data-w="${w}"][data-k="total"]`).value || "0";
+    return [planting, seedlings, total];
+  }
+
+  const body = [
+    ["Planting", ...weekRow("main")],
+    ["1. Under Planting", ...weekRow("under")],
+    ["2. Replacement (Re-supplying)", ...weekRow("replacement")],
+    ["3. Infilling", ...weekRow("infilling")],
+  ];
+
+  doc.autoTable({
+    startY: 100,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:9.5, cellPadding:8, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["Category","Number of Planting","Number of Seedlings","Total Planting Per Week"]],
+    body: body,
+    columnStyles:{ 0:{halign:"left",fontStyle:"bold"}, 3:{textColor:[179,38,30],fontStyle:"bold"} },
+  });
+
+  const todayNice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  const fname = `${todayNice} Cocoa Weekly Records.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.getElementById("f-block").value = "";
+  document.getElementById("f-supervisor").value = "";
+  document.getElementById("f-week-number").value = "";
+  document.querySelectorAll('input[type="checkbox"]').forEach(c=>{ c.checked = false; });
+  document.querySelectorAll('input[type="date"]').forEach(d=>{ d.value = ""; });
+  document.querySelectorAll('input[data-remarks]').forEach(r=>{ r.value = ""; });
+  ["main","under","replacement","infilling"].forEach(w=>{
+    document.querySelector(`[data-w="${w}"][data-k="planting"]`).value = "";
+    document.querySelector(`[data-w="${w}"][data-k="seedlings"]`).value = "";
+    document.querySelector(`[data-w="${w}"][data-k="total"]`).value = "";
+  });
+}
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+if(typeof clearForm === "function"){
+  const _origClearForm = clearForm;
+  clearForm = function(){
+    _origClearForm();
+    formTouched = false;
+  };
+}
+</script>
+</body>
+</html>

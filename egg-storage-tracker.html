@@ -490,7 +490,8 @@ function generatePDF(){
   y += 8;
   doc.addImage(chartCanvas.toDataURL("image/png",1.0), "PNG", imgX, y, imgW, imgH);
 
-  const fname = `Egg_Storage_Tracker_${new Date().toISOString().slice(0,10)}.pdf`;
+  const todayNice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  const fname = `${todayNice} Egg Storage Tracker.pdf`;
   doc.save(fname);
 }
 

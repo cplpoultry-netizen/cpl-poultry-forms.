@@ -323,7 +323,7 @@ function generatePDF(){
   doc.text(`Male Bird Count: ${male.length}`, marginL, y);
   doc.text(`Female Bird Count: ${female.length}`, marginL + 220, y);
 
-  const fname = `Bird_Average_Weight_${date || "draft"}.pdf`;
+  const fname = `${fmtDate(date).replace(/\//g," ") || "Draft"} Bird Average Weight.pdf`;
   doc.save(fname);
 }
 

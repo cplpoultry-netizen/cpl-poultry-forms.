@@ -413,7 +413,8 @@ function generatePDF(){
   doc.text(`Recorded By: ${name || "_______________________"}`, marginL, y);
   doc.text(`Initials: ${initials || "______"}`, marginL + 300, y);
 
-  const fname = `Saleable_Chicks_Egg_Production_${new Date().toISOString().slice(0,10)}.pdf`;
+  const todayNice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  const fname = `${todayNice} Saleable Chicks Egg Production.pdf`;
   doc.save(fname);
 }
 

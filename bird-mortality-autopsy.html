@@ -622,7 +622,7 @@ function generatePDF(){
     },
   });
 
-  const fname = `Bird_Mortality_Autopsy_${reportNo || reportDate || "draft"}.pdf`;
+  const fname = `${reportNo || fmtDate(reportDate).replace(/\//g," ") || "Draft"} Bird Mortality Autopsy.pdf`;
   doc.save(fname);
 }
 

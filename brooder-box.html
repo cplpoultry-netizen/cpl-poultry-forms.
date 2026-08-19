@@ -329,7 +329,7 @@ function generatePDF(){
   y += 16;
   doc.text(`GRAND TOTAL (Chicks Sold): ${grandSold}`, marginL, y);
 
-  const fname = `Brooder_Box_Checklist_${date || "draft"}.pdf`;
+  const fname = `${fmtDate(date).replace(/\//g," ") || "Draft"} Brooder Box Checklist.pdf`;
   doc.save(fname);
 }
 

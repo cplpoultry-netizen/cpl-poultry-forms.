@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cocoa Re-development Attendance Checklist</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --red:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:16px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
+  .wrap{max-width:900px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
+  }
+  .card h2{
+    font-size:13px;
+    margin:0 0 10px;
+    color:#fff;
+    background:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:140px;}
+  label{ display:block; font-size:10.5px; color:#5a5a4f; margin-bottom:3px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13.5px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:600;
+  }
+  input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  table.grid th{
+    background:var(--green-dark);
+    color:#fff;
+    padding:9px 6px;
+    font-size:11px;
+    font-weight:700;
+    text-align:center;
+    border:1px solid var(--green-dark);
+    border-bottom:2px solid var(--amber);
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:7px;
+    text-align:center;
+  }
+  table.grid td.name-cell{
+    text-align:left;
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+  }
+  table.grid input{
+    padding:7px 6px;
+    font-size:13px;
+    text-align:center;
+    min-width:110px;
+  }
+  .scroll-x{ overflow-x:auto; }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Cocoa Re-development Attendance Checklist</h1>
+  <p>Cocoa Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Details</h2>
+    <div class="row">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Block / Location</label><input type="text" id="f-block" placeholder="e.g. Block 4"></div>
+      <div class="field"><label>Supervisor</label><input type="text" id="f-supervisor"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Attendance</h2>
+    <div class="scroll-x">
+      <table class="grid" id="attendance-table">
+        <thead>
+          <tr><th>No.</th><th>Name</th><th>Present</th><th>Signature</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint">Tick Present, then have each worker type their name in the Signature box to confirm attendance.</p>
+  </div>
+
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+const NAMES = [
+  "Garry Apisai",
+  "Yakie Fidelis",
+  "Sinta Noah",
+  "Betty Nelson",
+  "Marry Jonathan",
+];
+
+function buildTable(){
+  const tbody = document.querySelector("#attendance-table tbody");
+  NAMES.forEach((name, i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td class="name-cell">${name}</td>
+      <td><input type="checkbox" data-present="${i}" style="width:20px;height:20px;"></td>
+      <td><input type="text" data-sig="${i}" placeholder="Sign here"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+buildTable();
+
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function generatePDF(){
+  const date = document.getElementById("f-date").value;
+  const block = document.getElementById("f-block").value;
+  const supervisor = document.getElementById("f-supervisor").value;
+
+  const body = NAMES.map((name, i)=>{
+    const present = document.querySelector(`[data-present="${i}"]`).checked ? "YES" : "";
+    const sig = document.querySelector(`[data-sig="${i}"]`).value;
+    return [i+1, name, present, sig || "_______________________"];
+  });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginL = 34;
+  const marginR = 34;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("2026 CPL COCOA RE-DEVELOPMENT PROGRAM", pageW/2, 28, {align:"center"});
+  doc.setFontSize(12);
+  doc.text("ATTENDANCE CHECKLIST", pageW/2, 45, {align:"center"});
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(marginL, 54, pageW - marginR, 54);
+  doc.setTextColor(0,0,0);
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Date: ${fmtDate(date) || "_______________________"}`, marginL, 70);
+  doc.text(`Block / Location: ${block || "_______________________"}`, marginL + 200, 70);
+  doc.text(`Supervisor: ${supervisor || "_______________________"}`, marginL, 86);
+
+  doc.autoTable({
+    startY: 100,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:10, cellPadding:9, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["No.","Name","Present","Signature"]],
+    body: body,
+    columnStyles:{ 1:{halign:"left",fontStyle:"bold"}, 2:{textColor:[179,38,30],fontStyle:"bold"}, 3:{halign:"left"} },
+  });
+
+  const fname = `${fmtDate(date).replace(/\//g," ") || "Draft"} Cocoa Attendance.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.getElementById("f-date").value = "";
+  document.getElementById("f-block").value = "";
+  document.getElementById("f-supervisor").value = "";
+  document.querySelectorAll('input[type="checkbox"]').forEach(c=>{ c.checked = false; });
+  document.querySelectorAll('input[data-sig]').forEach(s=>{ s.value = ""; });
+}
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+if(typeof clearForm === "function"){
+  const _origClearForm = clearForm;
+  clearForm = function(){
+    _origClearForm();
+    formTouched = false;
+  };
+}
+</script>
+</body>
+</html>

@@ -327,7 +327,7 @@ function generatePDF(){
     },
   });
 
-  const fname = `Egg_Grading_Percentage_${date || "draft"}.pdf`;
+  const fname = `${fmtDate(date).replace(/\//g," ") || "Draft"} Egg Grading Percentage.pdf`;
   doc.save(fname);
 }
 

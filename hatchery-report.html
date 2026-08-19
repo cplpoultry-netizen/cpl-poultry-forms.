@@ -495,7 +495,8 @@ function generatePDF(){
   doc.text(`Name: ${name || "_______________________"}`, marginL, bottomY);
   doc.text(`Position: ${position || "_______________________"}`, marginL + 260, bottomY);
 
-  const fname = `Hatchery_Record_${new Date().toISOString().slice(0,10)}.pdf`;
+  const todayNice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  const fname = `${todayNice} Hatchery Record.pdf`;
   doc.save(fname);
 }
 

@@ -333,7 +333,7 @@ function generatePDF(){
   doc.text(`Staff Signature: ${sig || "_______________________"}`, marginL, y);
   doc.text(`Date Submitted: ${fmtDate(submitted) || "_______________________"}`, marginL + 280, y);
 
-  const fname = `Monitor_Checklist_${MONTH_NAMES[month-1]}_${year}.pdf`;
+  const fname = `${MONTH_NAMES[month-1]} ${year} Monitor Checklist.pdf`;
   doc.save(fname);
 }
 

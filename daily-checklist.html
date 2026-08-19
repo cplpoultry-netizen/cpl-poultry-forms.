@@ -306,7 +306,12 @@
     <div class="row">
       <div class="field"><label>Total Table Eggs (auto)</label><input type="number" id="egg-table" readonly style="background:#f0efe8;"></div>
     </div>
+    <div class="row">
+      <div class="field"><label>Current Egg Storage</label><input type="number" id="egg-current-storage"></div>
+      <div class="field"><label>Total Storage Egg (auto)</label><input type="number" id="egg-total-storage" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
+    </div>
     <p class="hint">Table Eggs = Total Eggs − Hatchery Eggs − Smash Eggs, calculated automatically.</p>
+    <p class="hint">Total Storage Egg = Total Hatchery Eggs + Current Egg Storage, calculated automatically.</p>
   </div>
 
   <div class="card">
@@ -377,22 +382,40 @@ let houseRowCount = 0;
 function addHouseRow(){
   const tbody = document.querySelector("#house-table tbody");
   const i = houseRowCount++;
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td><input data-house="${i}" placeholder="COBB 1" style="min-width:56px;"></td>
-    <td><input data-house-time="${i}" placeholder="Morning" style="min-width:56px;"></td>
-    <td><input data-house-temp="${i}" style="min-width:50px;"></td>
-    <td><input data-house-hum="${i}" style="min-width:50px;"></td>
+
+  const trMorning = document.createElement("tr");
+  trMorning.innerHTML = `
+    <td rowspan="2" style="white-space:nowrap;vertical-align:middle;">COBB <input type="number" min="1" data-house-num="${i}" style="width:48px;display:inline-block;"></td>
+    <td class="rowlabel">Morning</td>
+    <td><input data-house-temp="${i}" data-slot="am" style="min-width:50px;"></td>
+    <td><input data-house-hum="${i}" data-slot="am" style="min-width:50px;"></td>
     <td>
-      <select data-house-ok="${i}">
+      <select data-house-ok="${i}" data-slot="am">
         <option value="">-</option>
         <option value="OK">OK</option>
         <option value="Not OK">Not OK</option>
       </select>
     </td>
-    <td><input data-house-remarks="${i}" style="min-width:64px;"></td>
+    <td><input data-house-remarks="${i}" data-slot="am" style="min-width:64px;"></td>
   `;
-  tbody.appendChild(tr);
+
+  const trAfternoon = document.createElement("tr");
+  trAfternoon.innerHTML = `
+    <td class="rowlabel">Afternoon</td>
+    <td><input data-house-temp="${i}" data-slot="pm" style="min-width:50px;"></td>
+    <td><input data-house-hum="${i}" data-slot="pm" style="min-width:50px;"></td>
+    <td>
+      <select data-house-ok="${i}" data-slot="pm">
+        <option value="">-</option>
+        <option value="OK">OK</option>
+        <option value="Not OK">Not OK</option>
+      </select>
+    </td>
+    <td><input data-house-remarks="${i}" data-slot="pm" style="min-width:64px;"></td>
+  `;
+
+  tbody.appendChild(trMorning);
+  tbody.appendChild(trAfternoon);
 }
 
 let feedRowCount = 0;
@@ -401,7 +424,7 @@ function addFeedRow(){
   const i = feedRowCount++;
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td><input data-feed-house="${i}" placeholder="COBB 1" style="min-width:56px;"></td>
+    <td style="white-space:nowrap;">COBB <input type="number" min="1" data-feed-housenum="${i}" style="width:46px;display:inline-block;"></td>
     <td><input data-feed-type="${i}" placeholder="Breeder Layer" style="min-width:70px;"></td>
     <td><input type="number" data-feed-male="${i}" oninput="updateFeedTotal(${i})" style="min-width:48px;"></td>
     <td><input type="number" data-feed-female="${i}" oninput="updateFeedTotal(${i})" style="min-width:48px;"></td>
@@ -441,7 +464,7 @@ function addVaccRow(){
   const i = vaccRowCount++;
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td><input data-vacc-house="${i}" placeholder="COBB 1" style="min-width:56px;"></td>
+    <td style="white-space:nowrap;">COBB <input type="number" min="1" data-vacc-housenum="${i}" style="width:46px;display:inline-block;"></td>
     <td><input data-vacc-vaccine="${i}" style="min-width:56px;"></td>
     <td><input data-vacc-mortality="${i}" style="min-width:40px;"></td>
     <td>
@@ -475,11 +498,18 @@ function updateTableEggs(){
   } else {
     tableEl.value = "";
   }
+  updateTotalStorage();
+}
+function updateTotalStorage(){
+  const hatchery = parseFloat(document.getElementById("egg-hatchery").value) || 0;
+  const currentStorage = parseFloat(document.getElementById("egg-current-storage").value) || 0;
+  document.getElementById("egg-total-storage").value = hatchery + currentStorage;
 }
 ["egg-9am","egg-12pm","egg-4pm"].forEach(id=>{
   document.getElementById(id).addEventListener("input", autoTotalEggs);
 });
 document.getElementById("egg-hatchery").addEventListener("input", updateTableEggs);
+document.getElementById("egg-current-storage").addEventListener("input", updateTotalStorage);
 document.getElementById("egg-smash").addEventListener("input", updateTableEggs);
 
 buildSetterTable();
@@ -516,18 +546,22 @@ function collectData(){
   });
 
   for(let i=0;i<houseRowCount;i++){
-    const house = val(`[data-house="${i}"]`);
-    const time = val(`[data-house-time="${i}"]`);
-    const temp = val(`[data-house-temp="${i}"]`);
-    const hum = val(`[data-house-hum="${i}"]`);
-    const ok = val(`[data-house-ok="${i}"]`);
-    const remarks = val(`[data-house-remarks="${i}"]`);
-    if(!house && !time && !temp && !hum && !ok && !remarks) continue;
-    data.house.push({ house, time, temp, hum, ok, remarks });
+    const houseNum = val(`[data-house-num="${i}"]`);
+    const house = houseNum ? `COBB ${houseNum}` : "";
+    ["am","pm"].forEach(slot=>{
+      const time = slot === "am" ? "Morning" : "Afternoon";
+      const temp = val(`[data-house-temp="${i}"][data-slot="${slot}"]`);
+      const hum = val(`[data-house-hum="${i}"][data-slot="${slot}"]`);
+      const ok = val(`[data-house-ok="${i}"][data-slot="${slot}"]`);
+      const remarks = val(`[data-house-remarks="${i}"][data-slot="${slot}"]`);
+      if(!house && !temp && !hum && !ok && !remarks) return;
+      data.house.push({ house, time, temp, hum, ok, remarks });
+    });
   }
 
   for(let i=0;i<feedRowCount;i++){
-    const house = val(`[data-feed-house="${i}"]`);
+    const houseNum = val(`[data-feed-housenum="${i}"]`);
+    const house = houseNum ? `COBB ${houseNum}` : "";
     const type = val(`[data-feed-type="${i}"]`);
     const male = val(`[data-feed-male="${i}"]`);
     const female = val(`[data-feed-female="${i}"]`);
@@ -540,7 +574,8 @@ function collectData(){
   }
 
   for(let i=0;i<vaccRowCount;i++){
-    const house = val(`[data-vacc-house="${i}"]`);
+    const houseNum = val(`[data-vacc-housenum="${i}"]`);
+    const house = houseNum ? `COBB ${houseNum}` : "";
     const vaccine = val(`[data-vacc-vaccine="${i}"]`);
     const mortality = val(`[data-vacc-mortality="${i}"]`);
     const gender = val(`[data-vacc-gender="${i}"]`);
@@ -559,6 +594,8 @@ function collectData(){
   data.eggTable = document.getElementById("egg-table").value;
   data.eggHatchery = document.getElementById("egg-hatchery").value;
   data.eggSmash = document.getElementById("egg-smash").value;
+  data.eggCurrentStorage = document.getElementById("egg-current-storage").value;
+  data.eggTotalStorage = document.getElementById("egg-total-storage").value;
   data.eggTotal = document.getElementById("egg-total").value;
   data.sigLeader = document.getElementById("sig-leader").value;
   data.sigManager = document.getElementById("sig-manager").value;
@@ -696,10 +733,11 @@ function generatePDF(){
   doc.autoTable({
     startY: y+4,
     margin:{left:marginL,right:marginL},
-    styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    styles:{ fontSize:7.5, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
-    head:[["9:00am","12:00pm","4:00pm","Total Eggs","Hatchery Eggs","Smash Eggs","Table Eggs"]],
-    body: [[d.egg9, d.egg12, d.egg4, d.eggTotal, d.eggHatchery, d.eggSmash, d.eggTable]],
+    head:[["9:00am","12:00pm","4:00pm","Total Eggs","Hatchery Eggs","Smash Eggs","Table Eggs","Current Storage","Total Storage Egg"]],
+    body: [[d.egg9, d.egg12, d.egg4, d.eggTotal, d.eggHatchery, d.eggSmash, d.eggTable, d.eggCurrentStorage, d.eggTotalStorage]],
+    columnStyles:{ 8:{ textColor:[179,38,30], fontStyle:"bold" } },
   });
   y = doc.lastAutoTable.finalY + 30;
 
@@ -710,7 +748,8 @@ function generatePDF(){
   doc.text(`Team Leader Signature: ${d.sigLeader || "________________________"}`, marginL, y);
   doc.text(`Manager Review: ${d.sigManager || "________________________"}`, marginL+280, y);
 
-  const fname = `Daily_OPS_Checklist_${d.date || "draft"}.pdf`;
+  const fileDate = d.date ? d.date.split("-").reverse().join(" ") : "Draft";
+  const fname = `${fileDate} Daily Poultry Operations.pdf`;
   doc.save(fname);
 }
 

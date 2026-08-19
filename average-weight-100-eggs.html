@@ -343,7 +343,7 @@ function generatePDF(){
   doc.text(`Recorded By: ${name || "_______________________"}`, marginL, y);
   doc.text(`Position: ${position || "_______________________"}`, marginL + 260, y);
 
-  const fname = `Average_Weight_100_Eggs_${date || "draft"}.pdf`;
+  const fname = `${fmtDate(date).replace(/\//g," ") || "Draft"} Average Weight 100 Eggs.pdf`;
   doc.save(fname);
 }
 
