@@ -153,6 +153,132 @@
     font-size:12px;
     font-weight:600;
   }
+  .toggle-btn{
+    flex:1;
+    min-width:150px;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:9px 10px;
+    border-radius:6px;
+    font-size:12px;
+    font-weight:700;
+  }
+  .sig-box{
+    margin-top:8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    min-height:64px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:6px;
+  }
+  .sig-box img{
+    max-width:100%;
+    max-height:60px;
+    display:none;
+  }
+  .sig-box img[src]:not([src=""]){ display:block; }
+  .sig-controls{
+    display:flex;
+    gap:8px;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+  .sig-upload-btn, .sig-draw-btn{
+    flex:1;
+    min-width:100px;
+    text-align:center;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:7px 8px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .sig-draw-btn{ background:var(--amber); }
+  .sig-clear-btn{
+    background:none;
+    border:1px solid var(--danger);
+    color:var(--danger);
+    padding:7px 10px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+  }
+  .sigpad-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+  }
+  .sigpad-overlay.open{ display:flex; }
+  .sigpad-box{
+    background:#fff;
+    border-radius:10px;
+    padding:14px;
+    width:100%;
+    max-width:420px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.3);
+  }
+  .sigpad-box h3{
+    margin:0 0 10px;
+    font-size:13px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+  .sigpad-canvas-wrap{
+    border:2px dashed var(--line);
+    border-radius:8px;
+    background:#fff;
+    touch-action:none;
+  }
+  #sigpad-canvas{
+    width:100%;
+    height:180px;
+    display:block;
+    background:#fff;
+    border-radius:6px;
+  }
+  .sigpad-hint{ font-size:11px; color:#7a7a6d; margin:8px 0; }
+  .sigpad-actions{
+    display:flex;
+    gap:8px;
+    margin-top:6px;
+  }
+  .sigpad-actions button{
+    flex:1;
+    padding:10px;
+    border-radius:8px;
+    border:none;
+    font-size:13px;
+    font-weight:700;
+  }
+  .sigpad-save{ background:var(--amber); color:#fff; }
+  .sigpad-clear{ background:var(--green-dark); color:#fff; }
+  .sigpad-cancel{ background:none; border:1px solid var(--line); color:var(--ink); }
+  .unit-field{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    justify-content:center;
+  }
+  .unit-field input{ min-width:44px; }
+  .unit-field .unit-suffix{
+    font-size:10.5px;
+    font-weight:700;
+    color:var(--green-dark);
+    white-space:nowrap;
+  }
   footer.bar{
     position:fixed;
     bottom:0;left:0;right:0;
@@ -236,6 +362,10 @@
 
   <div class="card">
     <h2>Fan & Ventilation Check</h2>
+    <div class="row" style="margin-bottom:10px;">
+      <button type="button" class="toggle-btn" id="toggle-fan-status-btn" onclick="toggleAllFanStatus()">Toggle All Fan Status: ON</button>
+      <button type="button" class="toggle-btn" id="toggle-fan-ok-btn" onclick="toggleAllFanOk()">Toggle All OK / Faulty: OK</button>
+    </div>
     <div class="scroll-x">
       <table class="grid" id="fan-table">
         <thead>
@@ -251,7 +381,7 @@
     <div class="scroll-x">
       <table class="grid" id="house-table">
         <thead>
-          <tr><th>House</th><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>OK</th><th>Remarks</th></tr>
+          <tr><th>House</th><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>Status</th><th>Remarks</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -317,8 +447,34 @@
   <div class="card">
     <h2>Sign Off</h2>
     <div class="row">
-      <div class="field"><label>Team Leader Signature (type name)</label><input type="text" id="sig-leader"></div>
-      <div class="field"><label>Manager Review (type name)</label><input type="text" id="sig-manager"></div>
+      <div class="field">
+        <label>Team Leader Signature</label>
+        <div class="sig-box" id="sig-leader-box">
+          <img id="sig-leader-img" alt="Team Leader Signature">
+        </div>
+        <div class="sig-controls">
+          <label class="sig-upload-btn">
+            Change Signature
+            <input type="file" accept="image/*" style="display:none;" onchange="handleSignatureUpload(event,'leader')">
+          </label>
+          <button type="button" class="sig-draw-btn" onclick="openSignaturePad('leader')">Draw Signature</button>
+          <button type="button" class="sig-clear-btn" onclick="clearSignature('leader')">Clear</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Manager Review</label>
+        <div class="sig-box" id="sig-manager-box">
+          <img id="sig-manager-img" alt="Manager Signature">
+        </div>
+        <div class="sig-controls">
+          <label class="sig-upload-btn">
+            Add Signature
+            <input type="file" accept="image/*" style="display:none;" onchange="handleSignatureUpload(event,'manager')">
+          </label>
+          <button type="button" class="sig-draw-btn" onclick="openSignaturePad('manager')">Draw Signature</button>
+          <button type="button" class="sig-clear-btn" onclick="clearSignature('manager')">Clear</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -330,7 +486,140 @@
   <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
 </footer>
 
+<div class="sigpad-overlay" id="sigpad-overlay">
+  <div class="sigpad-box">
+    <h3>Draw Your Signature</h3>
+    <div class="sigpad-canvas-wrap">
+      <canvas id="sigpad-canvas"></canvas>
+    </div>
+    <p class="sigpad-hint">Use your finger or mouse to draw. Tap Save when you're happy with it.</p>
+    <div class="sigpad-actions">
+      <button type="button" class="sigpad-cancel" onclick="closeSignaturePad()">Cancel</button>
+      <button type="button" class="sigpad-clear" onclick="clearSignaturePad()">Clear</button>
+      <button type="button" class="sigpad-save" onclick="saveSignaturePad()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
+
+// ---- Signature handling (Sign Off section) ----
+// Robby's signature is embedded by default for Team Leader Signature.
+// Both signature boxes stay fully editable — upload a different image or clear it anytime.
+const DEFAULT_LEADER_SIGNATURE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANwAAABuCAIAAADDOuqoAAASzUlEQVR4nO1daVvaWhc9mQcSwowyCij9/z+ntb332qqgICIQpgzn/bAez5MXrbUD5GjP+tDHxhC2ZGXPeyNRSonAQWBZVhAE5XJ5MBikLQvXkNMW4G/B8fGxJEmapsVxnLYsvENNW4C/At1u9+7uDj/LslAEP4D4gA6BwWAQhqEkSUEQ6Lqetji8QxI+5b5RLpcnk4nneb7vU0q3223aEvEOoSn3i+Pj4/F4HMexJEnb7dbzvLQlegMQmnK/UBQljmPLshRFWa1WYRimLdEbgNCUe4emaaZpLpfLKIr6/X7a4rwBCFLuEWdnZ3Ecl0ql7XZLKc3n858+fUpbqDcAYb73CEmSWq3WxcWFYRi5XO7m5iZtid4GhKbcF1qtFiHk4uKi1+ttt1uRnnw9hKbcF7LZbBAEq9WqVCoFQfDw8JC2RG8GoqKzF7RardVqFQQBIWQymYjS4k9B2JS9YDweZzIZQsiHDx8opSLo/ikIUv55FItFRVHK5TIh5Pb2lhASRVHaQr0lCJ/yD+Pk5OTi4qLf73/8+JEQIklSPp+fTCZpy/WWIHzKP4l6vQ7+gZGe58myLEqLPwthvv8Yer3e9fV1GIZHR0c4st1uXdf9999/0xXszYF3820YRhzHCGM5h6ZpYRi22+3//vsPR2zbXi6XqQr1JsG7+X4rjV79fj8Mw1KpxBhZLBZFfPNr4N18S5KkKEraUvwA/X5/MBhIkjQajXCkVqtNJhPLstIV7I2Ca1IeHx9TShuNRtqC/ADD4XCxWNi2zY6s12tCiGEY6Qn1hsG1T5nJZDabzet7EJvN5nq9ppSOx2N2sFwuMwW2D7Tb7a9fv6qqmnR8XddVVfX+/n5/7/uOwa+mbDabPxslXF5ejsfj5GNWq9UWi8WfFu3/8O3bN0JIcvKm1Wqt12vTNPf6vu8YXJDy9PRU13XHcXq9HjsIBZm0ia+BJEm5XA4/93q92Wy2Wq3+nKTPQJZlSZKS7uN4PA7DkGcTxDm4iL6vr6+DIAiCgM2hEkKQhZYk6ZUXQVmvXC5/+fIFR25ubvbt1VmWRSktFApJhwE0/dnHSYAhfU15dna2Wq1M01RVNaldkAx6fQA7n89t285ms7VaDRMIiqIkWb4PwIVN1mxqtdpqtapWq//8889e3/odI31N6fs+ISSKojAMN5tN8leu6w6Hw9dcpFKpbDYb0zS/ffu23W5t2w6CwHGcvUj8iEKhACGZbiaE3N7exnG877d+30iflOij0XWdUrrZbOr1+tXVVbfbVRTl9RnK+XxOHhMxhBDf9yuVytXV1Z5kBmazmWVZye7darVKKXUc5/z8/OXXdrtdWPk4jpOcJoScnJxst9vr62v8t1gs2ratqiohBJZEkiRKqSzLqqq+y6Gf9ElZrVZvbm4wzrJYLDA2MB6PFUVxXfc1Vzg9PSWESJIkyzKlVNM0Xdd/cyCm2+2u1+vNZoORbUppkgqapkVRFEXRdrstFouZTAZq/uHhIY5jmG/QCIiiCOsxKKVRFAVBkEwsGIZBKaWUVqtV27avrq7wM2YgJ5MJ3GtZlneahWVZzmQyxWIRwZxpmnEcb7fbOI4hJM75+vXr73wUhwcXeUrUP9br9cnJSRiGl5eXpmlKkvSawBltEBiCCcMQ6ieKIs/z4JVut1tES4qi4DTQJYoiWZZlWYZ+VRTlp6qCOB9MfXpc0zRsaJFlebPZYPo7SSlZlhVFAUcppaqqQnjXdVerFaU0CAIsxAKVCSGmaUJUy7LW6zWEZ1dIyoDnkzz2cWYyGbwXIYRSCqvCM1ImZa/Xg/FSVdV13fV6Dc202WwkSer1erCDrVZrNpuBVUEQwPXUNA1s22634BmShZIkhWGoKMpyuVQUBWntHUKAuC/LpqqqqqpQbMnjuCaSPrIsY5Ea24GxcxHDMKIoMgxDVVWcwyTRdd33feZGQ/sisIOfrSiKJEn4c2RZNk1zs9lomkYpXa/XuCAEwJ+/2Wzw1JmmGUVRHMf4F4zEQ0sIsW0b1+cWqZnvWq12d3cXBEG73d5sNlEULZdLdlPxrN/c3ORyOVVVl8sl4lxCCHM0sTIK/2VVH9wewzBgH6Mowq3Fb2EBcS+hZiiliqKAEE/JCiWElzNzrCgKU66wvJqmwWjqug5XGExyHMe2bRyXZTmKoh33EY7H58+fz87Ozs/Pe70e5IEweJZUVWWeCSHky5cvp6en6/Xatm3mUPb7faYvoyi6v7+HhPiLSOJB2hmq7HQ6o9GoUChwZeJT0JSnp6e3t7fz+XzH9sFUkcePEneFPPr1OIdxjhCyXC4ppYZhhGEYxzHOyWQysIyY/8e9xAUVRUE2FBRhF8zn858/f369/JVKZTwe67rO4iocfHh4KBQKPC9ELRQKhmEkJWTal6turIOSMpkJtywLGgt2EKYNamaz2VBKEXL6vm/bNlRptVq9vLzs9/tMQxSLxel0CtUSx3GlUjnAwH8mk1mtVq7rsrgbYmiahucBDjGMJh4JmOykwoYKh5uBg3EcQ3iozyAIoIZ/GMj/MkzThOcqSdLR0RHqpTzgcOa71+vBQyeEIBRl6o1SCncQppN5XdPpNElBYOe/uAju/fdWP8I4kkcX9uzsDO8Oh4wNZcPhg5NHKYV7QAiRZdmyLPxWlmU4BpIkVatV3/cNw5hOp+hEhuQ/rLY/G1QpipLNZhF4GYYRBAHcWdM0s9ksKG5ZFlxJ9lktl0vLsi4uLmq1WhiG8DXxWsuyDMNgqaWnYLGXpmn8MJIc3nyXy2XcVPa+CLGfvU/5fF7TNEVRsC0ckaNhGJlMBj/f3d2BWLBBjuMoiqLr+mQy2QlQdF3/HQsFcw/qMy82GTwZhgEGQ/mBGewc+BthGCIwRxwNXxNPFF6FiC2KIniiq9XqaXT/AiRJQnCWzFrgqTMMo1QqqarKepAB0zQppa1Wa3/6+BeQfkoIbvtms7m7u2O5jJ12te/dG5zMUonkuWTezvn4LYayoRdN00RqEzcVQQbzRBHDgkxhGD48PKiqCt1JCAmCwPd9PBjZbPYFtfQUT41Ap9NhIRdj8JcvXxqNBouskQPCA4C/JQgChFzr9Zq5uTDKTz9M13Vns9nrhUwF6ZOSoVQqMQcRLIFsUDnM1OIgrLau69CIMNzIQa5WK9xa8shax3Ew64OLM28BGW/HcS4uLl4j4dHR0e3tbTabnU6nOHJ6evr161d0IvMwIFYul+fzefLPR/4fjgcrAdRqtcvLy7SF/T4oN2g0GuCKaZrdbjf5K+RKGPr9PiJowLbtA4iHSrfjOEmpQPpsNnsAAX4HlUpFURTbtuHhEEI0TfM8L225nkf6XUIMqqoiw5fNZnfyeTspm48fP6JKAX1Zr9cPIB5c4WR5cDabwYCWSqUDCPA7uLm5CcPQ9/1qtQpPPQiC2WyG1XC8gSNSsmAiWTX+HhaLBYIDx3EO05QAdy3ZpQYjXq/Xdx4hnvH58+fRaNRoNOAOjUYjZKC4QvoNGQyo+aIW8vKZjuMgss7lcsnu2v0hn88TQrLZLFvA0u12gyDIZDJcO2fP4ejoaLFYxHFsmuZODoETcERK5MwppS9XZnu9HjuBTT7sFd1uF0oRze04gmE0RPFvAphMXy6Xo9FIlmXDMFzXNQyDQzXPUfRdKBQw/vdy1ct1XXS4IbF3AMFyudxisUhq5XK5PJ1Obdt+K6tQsXaLEIJCv+M4ruty2xvPkaY0TROpwRf0H8JwQkgcx9ls9gBSHR0dPTw8WJbFGNlsNqMoMk3zle2eB0av15vP52iSQkoSWUzbtguFAleVm++BI1KyfpYXGs5HoxG8ScMwisXiAaRSVRXTYezIeDyGN7ler6vVKsonKWak2+32cDhEKldVVQRkmUwmjmPP80zT1HWdqyagH4IjUqL7a7vdvmCU8VtULw4gEvaxxHGMJCUh5OTkBJWSKIo2mw3rhiyVSvsOufAFKMj/b7dbNKgnT7AsyzRNy7KKxSJXZcOfBUekRAUvDMPv7VjDjAHK3IcRCd9gZ5ompiLz+TzLTe4Iub+vAa1Wq5IkLZfLnY5xXddd183lckilvadhHY5IGQQBKjTfm/W+vb1VVdUwjIM19COOwQR3qVRiUT+b7A7DEOZ7H99IgvUe8/kcTaKoF6BdA9N27xW8kPLDhw+sUejZhADKNmEYImV4AHQ6HTQoZbPZZrN5d3fHvkIefUCz2YxFtX8kD3B8fDydTuHGsP5z27br9TpWA/8l4IWU3759YwryWeuMbJHjOAdTEpPJBL0g9/f3q9UK84FhGKKpEecwq/07qzi63e5ms/F9nyWYLMvyPI/nJva9ghdSrlYrWEPy3FaMer0OVXSYbDkhpFAo+L6fHDjEeEahUMjn85IkwYeD4rQsayfV0mq1EKS/vIO41WrhhfBbNE0rl8v7HlfnH7yQkiTa/p7uK0O7K+YNcKRcLt/d3VFK99QgiIInBgYwvRUEgaqqOyE25NlxgpHeJ9/fOXN6enp1dcWa8DVNKxaLP9WL+b7BCylx19GEu+OfFYtF2O5arQYHrlKpxHGM3Sz7SKF3Oh3f95H5AyMxAPS9oiJb0tJsNn3fByM9z0Nxkg1jwGVkXcMYqPhrbfQL4IWUGGfGLFVyo9Dx8TE8LU3TYNdOT09HoxF0GHoEf/lN2+32s+29V1dXQRBomoalWbZtZzKZZ3t4J5MJ2+TRaDRGoxGl1PO8MAzZ0zKZTCqViqqqWDNECHFd13Gcg/U3vTlwQUrURWRZho5k1vDs7Aw3UtM09j0gs9kMyTk07Pxak0u73cbXi0iS1Gw2UfDo9/vD4RBeoK7rSJqSx21HT1GpVLDYHBlWNmM0n88ppSxLgJW+aLTDXjjhNb4MLvopoRoZvZjjOBqN4jg2DKNer4M3tVotjuP7+3v4nclZs06nYxiGruvdbveH73h/f4/YhRDi+36327Vt+/z8fD6fY76C7QkqFov1ev1ZJwFd6LIsw14bhsFmhjAdhr+F7WErFovz+Vww8ofggpQsUmHj0oSQRqOBZDWbyyGEsFADKetcLoem9OPj4+vra0ppEATJ1Hq9Xi8UCrlcjrWy9vt9SZKwCgHpQFmWLy4uVqsV8jvQlGhfIIRMp9PBYPBsxgd6NAxDdCWaplkoFOBOYDimVCpRSk3TrFQqs9nslWsNBdI3381mE3eOEILBU+Qpb29vwzDE7lMMhubzeRbPghAIgOr1Ou43tupA4yIMYhF9FEVoi2Sjj6BRFEWz2Yw+TkLCczBNs1qtnp+fW5YF7/DZVf4In7EqyPO8q6urTqeDeYk4jgeDAZKa4vudfhbpkxKwbVvX9eFwSB9397AtLohta7XabDZbLpeNRuPy8tJ1XZzWaDSur68RJuP8h4cHbCNhO4BQTx8MBthLoet6GIYYmITnkM/ns9ksFr6RR0eiXq8jRq5UKs/KfHt72263NU1jI0Sz2QwywDnGFqR9f3TvD+mTkjmUbOAadxR6KI7j4XDY7Xax+tF1XfBmPp9vt9vj42OY+FwuB04TQpBwQRMhinUgZXJ9CtupgsgDmvjs7IwQglh7MBj4vq9pWq1WeyFG3gnek+vdJEkS+3x/DVyQ0nXd+/t7fJWTqqrz+bxQKLBxerbsxXVdOJTVanWxWEiSNBwO0RSMLp5Op4POwjAMbduGCcYLfd/PZrOLxQL9ufAmd7LurPKOJaiY/dtZKfEaeJ5XLBY5HDN4K0h/HEJRFM/zJpNJs9m8urqCG4fAwrZtTdOw5/fo6IippXK5DP0ahmGtVnv9zjTP80BETdNardbOC7G5in0g5XL5fTfjcIv0o2/EHORxGSTGx2AH0bIlSVKpVEoayvF4vFgssKPxp7b4IZySJKnRaOy8EEuO0KeNXVOCkWkhffPtOA6abhApJz3L+XyOKt9Obg/nO47zs83eNzc3nuc9O+2Vz+dZW5BhGG9lIuxdIn1Sksc8JUZz2IBOEASj0ci27adtDcViUZblX+tgeIFt2Lljmmaz2fyFKwv8KaRPynK5zCoihBBUwAkhaNKpVCpPi877yEJ/+vSp3W5jG68oSaeL9AMdhqOjI6yyRU5bUZR9f62iAJ9IP9BhYAOK2BWd3Noj8FchffPNgBgcW6Jd1xWNhn8tONKUbOG5aZqCkX8zOCIls9f7m6EWeBPgiJTX19fo+3rNfkqBdwyOom9CiOd5y+Xy5QlAgXcPvnRSJpP5nQFqgfcBvjSlgADhyqcUEAAEKQW4gyClAHcQpBTgDoKUAtxBkFKAOwhSCnAHQUoB7iBIKcAdBCkFuIMgpQB3EKQU4A6ClALcQZBSgDsIUgpwB0FKAe4gSCnAHQQpBbiDIKUAdxCkFOAOgpQC3EGQUoA7CFIKcAdBSgHuIEgpwB0EKQW4gyClAHcQpBTgDoKUAtxBkFKAOwhSCnAHQUoB7iBIKcAd/gfqXhgjoO9q8QAAAABJRU5ErkJggg==";
+const signatures = { leader: DEFAULT_LEADER_SIGNATURE, manager: "" };
+
+function refreshSignatureImages(){
+  const leaderImg = document.getElementById("sig-leader-img");
+  const managerImg = document.getElementById("sig-manager-img");
+  if(leaderImg) leaderImg.src = signatures.leader || "";
+  if(managerImg) managerImg.src = signatures.manager || "";
+}
+
+function handleSignatureUpload(event, who){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    signatures[who] = e.target.result;
+    refreshSignatureImages();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSignature(who){
+  signatures[who] = "";
+  refreshSignatureImages();
+}
+
+// ---- Draw-your-own-signature pad ----
+let sigPadTarget = null;
+let sigPadDrawing = false;
+let sigPadHasStrokes = false;
+let sigPadCtx = null;
+
+function openSignaturePad(who){
+  sigPadTarget = who;
+  sigPadHasStrokes = false;
+  document.getElementById("sigpad-overlay").classList.add("open");
+  setupSignaturePadCanvas();
+}
+
+function closeSignaturePad(){
+  document.getElementById("sigpad-overlay").classList.remove("open");
+  sigPadTarget = null;
+}
+
+function setupSignaturePadCanvas(){
+  const canvas = document.getElementById("sigpad-canvas");
+  // Match the canvas's internal resolution to its displayed size for crisp lines.
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(2, 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1a1a1a";
+  sigPadCtx = ctx;
+
+  function getPos(e){
+    const r = canvas.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    return { x: point.clientX - r.left, y: point.clientY - r.top };
+  }
+
+  function start(e){
+    e.preventDefault();
+    sigPadDrawing = true;
+    sigPadHasStrokes = true;
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+  function move(e){
+    if(!sigPadDrawing) return;
+    e.preventDefault();
+    const p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+  function end(e){
+    sigPadDrawing = false;
+  }
+
+  canvas.onmousedown = start;
+  canvas.onmousemove = move;
+  window.onmouseup = end;
+  canvas.ontouchstart = start;
+  canvas.ontouchmove = move;
+  canvas.ontouchend = end;
+}
+
+function clearSignaturePad(){
+  if(!sigPadCtx) return;
+  const canvas = document.getElementById("sigpad-canvas");
+  const rect = canvas.getBoundingClientRect();
+  sigPadCtx.fillStyle = "#ffffff";
+  sigPadCtx.fillRect(0, 0, rect.width, rect.height);
+  sigPadHasStrokes = false;
+}
+
+function saveSignaturePad(){
+  if(!sigPadTarget) return;
+  if(!sigPadHasStrokes){
+    alert("Draw a signature first, or tap Cancel.");
+    return;
+  }
+  const canvas = document.getElementById("sigpad-canvas");
+  signatures[sigPadTarget] = canvas.toDataURL("image/png");
+  refreshSignatureImages();
+  closeSignaturePad();
+}
+
 const setterItems = ["Setter 1","Setter 2","Setter 3","Setter 4","Hatcher 1","Hatcher 2","Hatcher 3"];
 const fanItems = ["Fan 1","Fan 2","Fan 3","Fan 4","Outer Fan 1","Outer Fan 2","Outer Fan 3"];
 
@@ -378,6 +667,28 @@ function buildFanTable(){
   });
 }
 
+let fanStatusToggleOn = true;
+function toggleAllFanStatus(){
+  const nextValue = fanStatusToggleOn ? "ON" : "OFF";
+  fanItems.forEach((name,i)=>{
+    const sel = document.querySelector(`[data-fan-status="${i}"]`);
+    if(sel) sel.value = nextValue;
+  });
+  fanStatusToggleOn = !fanStatusToggleOn;
+  document.getElementById("toggle-fan-status-btn").textContent = `Toggle All Fan Status: ${fanStatusToggleOn ? "ON" : "OFF"}`;
+}
+
+let fanOkToggleOn = true;
+function toggleAllFanOk(){
+  const nextValue = fanOkToggleOn ? "OK" : "Faulty";
+  fanItems.forEach((name,i)=>{
+    const sel = document.querySelector(`[data-fan-ok="${i}"]`);
+    if(sel) sel.value = nextValue;
+  });
+  fanOkToggleOn = !fanOkToggleOn;
+  document.getElementById("toggle-fan-ok-btn").textContent = `Toggle All OK / Faulty: ${fanOkToggleOn ? "OK" : "Faulty"}`;
+}
+
 let houseRowCount = 0;
 function addHouseRow(){
   const tbody = document.querySelector("#house-table tbody");
@@ -387,12 +698,23 @@ function addHouseRow(){
   trMorning.innerHTML = `
     <td rowspan="2" style="white-space:nowrap;vertical-align:middle;">COBB <input type="number" min="1" data-house-num="${i}" style="width:48px;display:inline-block;"></td>
     <td class="rowlabel">Morning</td>
-    <td><input data-house-temp="${i}" data-slot="am" style="min-width:50px;"></td>
-    <td><input data-house-hum="${i}" data-slot="am" style="min-width:50px;"></td>
+    <td>
+      <div class="unit-field">
+        <input type="number" step="0.1" data-house-temp="${i}" data-slot="am" oninput="updateHouseStatus(${i},'am')">
+        <span class="unit-suffix">°C</span>
+      </div>
+    </td>
+    <td>
+      <div class="unit-field">
+        <input type="number" step="0.1" data-house-hum="${i}" data-slot="am">
+        <span class="unit-suffix">%</span>
+      </div>
+    </td>
     <td>
       <select data-house-ok="${i}" data-slot="am">
         <option value="">-</option>
         <option value="OK">OK</option>
+        <option value="Moderate">Moderate</option>
         <option value="Not OK">Not OK</option>
       </select>
     </td>
@@ -402,12 +724,23 @@ function addHouseRow(){
   const trAfternoon = document.createElement("tr");
   trAfternoon.innerHTML = `
     <td class="rowlabel">Afternoon</td>
-    <td><input data-house-temp="${i}" data-slot="pm" style="min-width:50px;"></td>
-    <td><input data-house-hum="${i}" data-slot="pm" style="min-width:50px;"></td>
+    <td>
+      <div class="unit-field">
+        <input type="number" step="0.1" data-house-temp="${i}" data-slot="pm" oninput="updateHouseStatus(${i},'pm')">
+        <span class="unit-suffix">°C</span>
+      </div>
+    </td>
+    <td>
+      <div class="unit-field">
+        <input type="number" step="0.1" data-house-hum="${i}" data-slot="pm">
+        <span class="unit-suffix">%</span>
+      </div>
+    </td>
     <td>
       <select data-house-ok="${i}" data-slot="pm">
         <option value="">-</option>
         <option value="OK">OK</option>
+        <option value="Moderate">Moderate</option>
         <option value="Not OK">Not OK</option>
       </select>
     </td>
@@ -416,6 +749,24 @@ function addHouseRow(){
 
   tbody.appendChild(trMorning);
   tbody.appendChild(trAfternoon);
+}
+
+// Auto-fills Status and Remarks based on the temperature reading. Fields stay
+// normal and editable afterward, so you can change the auto-filled text anytime.
+function updateHouseStatus(i, slot){
+  const temp = parseFloat(val(`[data-house-temp="${i}"][data-slot="${slot}"]`));
+  if(isNaN(temp)) return;
+  const statusEl = document.querySelector(`[data-house-ok="${i}"][data-slot="${slot}"]`);
+  const remarksEl = document.querySelector(`[data-house-remarks="${i}"][data-slot="${slot}"]`);
+  if(!statusEl || !remarksEl) return;
+
+  if(temp >= 29){
+    statusEl.value = "Not OK";
+    remarksEl.value = "High Risk of Heat Stress";
+  } else if(temp >= 25.0 && temp <= 28.5){
+    statusEl.value = "Moderate";
+    remarksEl.value = "Conducive Temperature";
+  }
 }
 
 let feedRowCount = 0;
@@ -466,7 +817,7 @@ function addVaccRow(){
   tr.innerHTML = `
     <td style="white-space:nowrap;">COBB <input type="number" min="1" data-vacc-housenum="${i}" style="width:46px;display:inline-block;"></td>
     <td><input data-vacc-vaccine="${i}" style="min-width:56px;"></td>
-    <td><input data-vacc-mortality="${i}" style="min-width:40px;"></td>
+    <td><input type="number" min="0" data-vacc-mortality="${i}" oninput="checkMortalityAlert(${i})" style="min-width:40px;"></td>
     <td>
       <select data-vacc-gender="${i}">
         <option value="">-</option>
@@ -478,6 +829,17 @@ function addVaccRow(){
     <td><input data-vacc-action="${i}" style="min-width:64px;"></td>
   `;
   tbody.appendChild(tr);
+}
+
+// Auto-fills the Action box when Mortality goes above 3. The box stays a normal
+// editable field, so you can change or clear the note anytime.
+function checkMortalityAlert(i){
+  const mortality = parseFloat(val(`[data-vacc-mortality="${i}"]`));
+  if(isNaN(mortality)) return;
+  if(mortality >= 3){
+    const actionEl = document.querySelector(`[data-vacc-action="${i}"]`);
+    if(actionEl) actionEl.value = "Need to check for possible signs of infection or stress level.";
+  }
 }
 
 function autoTotalEggs(){
@@ -517,6 +879,7 @@ buildFanTable();
 addHouseRow();
 addFeedRow();
 addVaccRow();
+refreshSignatureImages();
 
 function val(sel){ const e = document.querySelector(sel); return e ? e.value : ""; }
 
@@ -597,8 +960,6 @@ function collectData(){
   data.eggCurrentStorage = document.getElementById("egg-current-storage").value;
   data.eggTotalStorage = document.getElementById("egg-total-storage").value;
   data.eggTotal = document.getElementById("egg-total").value;
-  data.sigLeader = document.getElementById("sig-leader").value;
-  data.sigManager = document.getElementById("sig-manager").value;
 
   return data;
 }
@@ -677,7 +1038,7 @@ function generatePDF(){
     margin:{left:marginL,right:marginL},
     styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
-    head:[["House No","Time","Temp (°C)","Humidity (%)","OK / Not OK","Remarks"]],
+    head:[["House No","Time","Temp (°C)","Humidity (%)","Status","Remarks"]],
     body: d.house.map(r=>[r.house, r.time, r.temp, r.hum, r.ok, r.remarks]),
     columnStyles:{0:{halign:"left",fontStyle:"bold"}, 5:{halign:"left"}},
   });
@@ -741,12 +1102,37 @@ function generatePDF(){
   });
   y = doc.lastAutoTable.finalY + 30;
 
-  if(y > 760){ doc.addPage(); y = 40; }
+  if(y > 700){ doc.addPage(); y = 40; }
+
+  const sigImgW = 90;
+  const sigImgH = 34;
+  const sigColW = 280;
+
+  function imageFormatFromDataUrl(dataUrl){
+    if(!dataUrl) return "JPEG";
+    if(dataUrl.indexOf("image/png") !== -1) return "PNG";
+    if(dataUrl.indexOf("image/webp") !== -1) return "WEBP";
+    return "JPEG";
+  }
+
+  const sigTop = y;
+  if(signatures.leader){
+    try{ doc.addImage(signatures.leader, imageFormatFromDataUrl(signatures.leader), marginL, sigTop, sigImgW, sigImgH); }catch(e){}
+  }
+  if(signatures.manager){
+    try{ doc.addImage(signatures.manager, imageFormatFromDataUrl(signatures.manager), marginL + sigColW, sigTop, sigImgW, sigImgH); }catch(e){}
+  }
+
+  const lineY = sigTop + sigImgH + 6;
+  doc.setDrawColor(150,150,140);
+  doc.setLineWidth(0.6);
+  doc.line(marginL, lineY, marginL + sigImgW, lineY);
+  doc.line(marginL + sigColW, lineY, marginL + sigColW + sigImgW, lineY);
 
   doc.setFont("helvetica","normal");
   doc.setFontSize(9.5);
-  doc.text(`Team Leader Signature: ${d.sigLeader || "________________________"}`, marginL, y);
-  doc.text(`Manager Review: ${d.sigManager || "________________________"}`, marginL+280, y);
+  doc.text("Team Leader Signature", marginL, lineY + 12);
+  doc.text("Manager Review", marginL + sigColW, lineY + 12);
 
   const fileDate = d.date ? d.date.split("-").reverse().join(" ") : "Draft";
   const fname = `${fileDate} Daily Poultry Operations.pdf`;
