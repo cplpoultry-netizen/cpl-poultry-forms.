@@ -279,6 +279,42 @@
     color:var(--green-dark);
     white-space:nowrap;
   }
+  .egg-multi{ min-width:100px; }
+  .egg-readings{
+    display:flex;
+    flex-wrap:wrap;
+    gap:3px;
+    justify-content:center;
+    margin-bottom:4px;
+  }
+  .egg-reading-input{
+    width:38px !important;
+    min-width:38px !important;
+    padding:4px 2px !important;
+    font-size:11px !important;
+  }
+  .egg-multi-actions{
+    display:flex;
+    gap:4px;
+    justify-content:center;
+    margin-bottom:4px;
+  }
+  .egg-multi-actions button{
+    flex:1;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:4px 6px;
+    border-radius:5px;
+    font-size:11px;
+    font-weight:700;
+  }
+  .egg-multi-actions button.calc-btn{ background:var(--amber); }
+  .egg-avg-field input{
+    background:#fbeceb;
+    color:var(--danger);
+    font-weight:800;
+  }
   footer.bar{
     position:fixed;
     bottom:0;left:0;right:0;
@@ -629,16 +665,105 @@ function buildSetterTable(){
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="rowlabel">${name}</td>
-      <td><input data-k="tempAM" data-i="${i}"></td>
-      <td><input data-k="tempPM" data-i="${i}"></td>
-      <td><input data-k="humAM" data-i="${i}"></td>
-      <td><input data-k="humPM" data-i="${i}"></td>
-      <td><input data-k="eggAM" data-i="${i}"></td>
-      <td><input data-k="eggPM" data-i="${i}"></td>
+      <td>
+        <div class="unit-field">
+          <input type="number" step="0.1" data-k="tempAM" data-i="${i}">
+          <span class="unit-suffix">°C</span>
+        </div>
+      </td>
+      <td>
+        <div class="unit-field">
+          <input type="number" step="0.1" data-k="tempPM" data-i="${i}">
+          <span class="unit-suffix">°C</span>
+        </div>
+      </td>
+      <td>
+        <div class="unit-field">
+          <input type="number" step="0.1" data-k="humAM" data-i="${i}">
+          <span class="unit-suffix">%</span>
+        </div>
+      </td>
+      <td>
+        <div class="unit-field">
+          <input type="number" step="0.1" data-k="humPM" data-i="${i}">
+          <span class="unit-suffix">%</span>
+        </div>
+      </td>
+      <td>
+        <div class="egg-multi">
+          <div class="egg-readings" id="egg-readings-am-${i}">
+            <input type="number" step="0.1" class="egg-reading-input" data-eggreading="am-${i}">
+          </div>
+          <div class="egg-multi-actions">
+            <button type="button" onclick="addEggReading('am',${i})">+</button>
+            <button type="button" class="calc-btn" onclick="calcEggAverage('am',${i})">=</button>
+          </div>
+          <div class="unit-field egg-avg-field">
+            <input type="text" data-k="eggAM" data-i="${i}" readonly placeholder="Avg">
+            <span class="unit-suffix">°C</span>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="egg-multi">
+          <div class="egg-readings" id="egg-readings-pm-${i}">
+            <input type="number" step="0.1" class="egg-reading-input" data-eggreading="pm-${i}">
+          </div>
+          <div class="egg-multi-actions">
+            <button type="button" onclick="addEggReading('pm',${i})">+</button>
+            <button type="button" class="calc-btn" onclick="calcEggAverage('pm',${i})">=</button>
+          </div>
+          <div class="unit-field egg-avg-field">
+            <input type="text" data-k="eggPM" data-i="${i}" readonly placeholder="Avg">
+            <span class="unit-suffix">°C</span>
+          </div>
+        </div>
+      </td>
       <td><input data-k="remarks" data-i="${i}" style="min-width:70px;"></td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function addEggReading(slot, i){
+  const container = document.getElementById(`egg-readings-${slot}-${i}`);
+  const input = document.createElement("input");
+  input.type = "number";
+  input.step = "0.1";
+  input.className = "egg-reading-input";
+  input.setAttribute("data-eggreading", `${slot}-${i}`);
+  container.appendChild(input);
+}
+
+function calcEggAverage(slot, i){
+  const container = document.getElementById(`egg-readings-${slot}-${i}`);
+  const inputs = container.querySelectorAll(".egg-reading-input");
+  const values = [];
+  inputs.forEach(inp=>{ if(inp.value !== "") values.push(parseFloat(inp.value)); });
+  const avgField = document.querySelector(`[data-k="egg${slot === "am" ? "AM" : "PM"}"][data-i="${i}"]`);
+  if(values.length === 0){
+    avgField.value = "";
+    return;
+  }
+  const avg = values.reduce((a,b)=>a+b,0) / values.length;
+  avgField.value = avg.toFixed(1);
+  updateSetterTempRemarks(i, slot === "am" ? "AM" : "PM");
+}
+
+// Auto-fills Remarks based on the Egg Temp average (AM or PM) just calculated.
+// The Remarks box stays a normal editable field, so you can change it anytime.
+function updateSetterTempRemarks(i, slot){
+  const temp = parseFloat(val(`[data-k="egg${slot}"][data-i="${i}"]`));
+  if(isNaN(temp)) return;
+
+  const remarksEl = document.querySelector(`[data-k="remarks"][data-i="${i}"]`);
+  if(!remarksEl) return;
+
+  if(temp >= 37.0 && temp <= 38.5){
+    remarksEl.value = "Optimal Temperature";
+  } else if(temp > 38.5){
+    remarksEl.value = "High Risk of Embryo Damage, Need to Check Ventilation";
+  }
 }
 
 function buildFanTable(){
