@@ -455,6 +455,16 @@
       </table>
     </div>
     <button class="add-row" onclick="addVaccRow()">+ Add entry</button>
+
+    <div class="row" style="margin-top:14px;">
+      <div class="field"><label>Opening Stock — Male Birds</label><input type="number" min="0" id="stock-open-M" oninput="onStockOpeningEdit()"></div>
+      <div class="field"><label>Opening Stock — Female Birds</label><input type="number" min="0" id="stock-open-F" oninput="onStockOpeningEdit()"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Closing Stock — Male Birds (auto)</label><input type="number" id="stock-close-M" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
+      <div class="field"><label>Closing Stock — Female Birds (auto)</label><input type="number" id="stock-close-F" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
+    </div>
+    <p class="hint">Closing Stock = Opening Stock − the Male / Female mortalities entered above. Type your starting figures once. When you tap Generate PDF, today's Closing Stock is saved and becomes tomorrow's Opening Stock. You can still change the Opening Stock any time to correct it.</p>
   </div>
 
   <div class="card">
@@ -942,9 +952,9 @@ function addVaccRow(){
   tr.innerHTML = `
     <td style="white-space:nowrap;">COBB <input type="number" min="1" data-vacc-housenum="${i}" style="width:46px;display:inline-block;"></td>
     <td><input data-vacc-vaccine="${i}" style="min-width:56px;"></td>
-    <td><input type="number" min="0" data-vacc-mortality="${i}" oninput="checkMortalityAlert(${i})" style="min-width:40px;"></td>
+    <td><input type="number" min="0" data-vacc-mortality="${i}" oninput="checkMortalityAlert(${i}); updateBirdStock()" style="min-width:40px;"></td>
     <td>
-      <select data-vacc-gender="${i}">
+      <select data-vacc-gender="${i}" onchange="updateBirdStock()">
         <option value="">-</option>
         <option value="Male">Male</option>
         <option value="Female">Female</option>
@@ -967,8 +977,64 @@ function checkMortalityAlert(i){
   }
 }
 
+// ---- Male / Female bird stock (carried forward from form to form) ----
+// The stock figure lives in this browser's own storage, so it is still there after the
+// PDF is made and when the page is reloaded. It only works once the file is hosted
+// (e.g. on GitHub Pages), not inside a chat preview.
+const BIRD_STOCK_KEY = "cpl_bird_stock_v1";
+
+function loadBirdStock(){
+  try{
+    const raw = localStorage.getItem(BIRD_STOCK_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function saveBirdStock(male, female){
+  try{ localStorage.setItem(BIRD_STOCK_KEY, JSON.stringify({ male, female })); }catch(e){}
+}
+function vaccMortalityTotals(){
+  let male = 0, female = 0;
+  for(let i=0;i<vaccRowCount;i++){
+    const n = parseFloat(val(`[data-vacc-mortality="${i}"]`)) || 0;
+    const g = val(`[data-vacc-gender="${i}"]`);
+    if(g === "Male") male += n;
+    else if(g === "Female") female += n;
+  }
+  return { male, female };
+}
+function updateBirdStock(){
+  const t = vaccMortalityTotals();
+  const oM = document.getElementById("stock-open-M").value;
+  const oF = document.getElementById("stock-open-F").value;
+  document.getElementById("stock-close-M").value = oM === "" ? "" : (parseFloat(oM) - t.male);
+  document.getElementById("stock-close-F").value = oF === "" ? "" : (parseFloat(oF) - t.female);
+}
+// Typing or correcting the Opening Stock saves it straight away as the new starting figure.
+function onStockOpeningEdit(){
+  saveBirdStock(document.getElementById("stock-open-M").value, document.getElementById("stock-open-F").value);
+  updateBirdStock();
+}
+function restoreBirdStock(){
+  const s = loadBirdStock();
+  if(s){
+    document.getElementById("stock-open-M").value = s.male;
+    document.getElementById("stock-open-F").value = s.female;
+  }
+  updateBirdStock();
+}
+// Called when the PDF is made: today's closing stock becomes the next form's opening stock.
+function commitBirdStock(){
+  updateBirdStock();
+  const cM = document.getElementById("stock-close-M").value;
+  const cF = document.getElementById("stock-close-F").value;
+  if(cM !== "" || cF !== ""){
+    const s = loadBirdStock() || {};
+    saveBirdStock(cM !== "" ? cM : (s.male ?? ""), cF !== "" ? cF : (s.female ?? ""));
+  }
+}
+
 function autoTotalEggs(){
-  const am = parseFloat(document.getElementById("egg-9am").value) || 0;
+  const am =parseFloat(document.getElementById("egg-9am").value) || 0;
   const noon = parseFloat(document.getElementById("egg-12pm").value) || 0;
   const pm = parseFloat(document.getElementById("egg-4pm").value) || 0;
   const total = am+noon+pm;
@@ -1005,6 +1071,7 @@ addHouseRow();
 addFeedRow();
 addVaccRow();
 refreshSignatureImages();
+restoreBirdStock();
 
 function val(sel){ const e = document.querySelector(sel); return e ? e.value : ""; }
 
@@ -1085,6 +1152,10 @@ function collectData(){
   data.eggCurrentStorage = document.getElementById("egg-current-storage").value;
   data.eggTotalStorage = document.getElementById("egg-total-storage").value;
   data.eggTotal = document.getElementById("egg-total").value;
+  data.stockOpenM = document.getElementById("stock-open-M").value;
+  data.stockOpenF = document.getElementById("stock-open-F").value;
+  data.stockCloseM = document.getElementById("stock-close-M").value;
+  data.stockCloseF = document.getElementById("stock-close-F").value;
 
   return data;
 }
@@ -1207,6 +1278,27 @@ function generatePDF(){
     body: d.vacc.map(r=>[r.house, r.vaccine, r.mortality, r.gender, r.finding, r.action]),
     columnStyles:{0:{halign:"left",fontStyle:"bold"}, 4:{halign:"left"}, 5:{halign:"left"}},
   });
+  y = doc.lastAutoTable.finalY + 6;
+
+  doc.autoTable({
+    startY: y,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["Bird Stock","Male","Female"]],
+    body:[
+      ["Opening Stock", d.stockOpenM, d.stockOpenF],
+      ["Closing Stock", d.stockCloseM, d.stockCloseF],
+    ],
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}},
+    didParseCell: function(data){
+      if(data.section === "body" && data.row.index === 1 && data.column.index > 0){
+        data.cell.styles.textColor = [179,38,30];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+    tableWidth: 220,
+  });
   y = doc.lastAutoTable.finalY + 12;
 
   if(y > 680){ doc.addPage(); y = 40; }
@@ -1262,12 +1354,14 @@ function generatePDF(){
   const fileDate = d.date ? d.date.split("-").reverse().join(" ") : "Draft";
   const fname = `${fileDate} Daily Poultry Operations.pdf`;
   doc.save(fname);
+  commitBirdStock();
 }
 
 function clearForm(){
   if(!confirm("Clear all entered data?")) return;
   document.querySelectorAll("input").forEach(i=>i.value="");
   document.querySelectorAll("select").forEach(s=>s.value="");
+  restoreBirdStock();
   formTouched = false;
 }
 
