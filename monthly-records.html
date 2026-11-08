@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly Poultry Records</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{ --ink:#1f2a1f; --paper:#f7f5ef; --green:#3f5d3a; --green-dark:#2b4127; --amber:#c98a2c; --red:#b3261e; --line:#d8d3c4; --card:#fff; }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; background:var(--paper); color:var(--ink); }
+  header{ background:var(--green-dark); color:#fff; padding:22px 20px 18px; text-align:center; }
+  header h1{ margin:0; font-size:20px; }
+  header p{ margin:6px 0 0; font-size:13px; opacity:.85; }
+  .wrap{ max-width:980px; margin:0 auto; padding:14px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  .card h2{ margin:0 0 10px; font-size:15px; color:var(--green-dark); }
+  label{ display:block; font-size:12px; color:#6a6a5e; margin-bottom:4px; }
+  input[type=month]{ font-size:16px; padding:8px; border:1px solid var(--line); border-radius:6px; }
+  .btns{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  button{ font-size:14px; padding:10px 14px; border-radius:8px; border:1px solid var(--green); background:#fff; color:var(--green-dark); cursor:pointer; }
+  button.primary{ background:var(--green-dark); color:#fff; border-color:var(--green-dark); }
+  button.amber{ background:var(--amber); border-color:var(--amber); color:#fff; }
+  button.danger{ color:var(--red); border-color:var(--red); }
+  button:disabled{ opacity:.5; cursor:not-allowed; }
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+  .kpi{ border:1px solid var(--line); border-radius:8px; padding:10px; background:#fbfaf6; }
+  .kpi b{ display:block; font-size:20px; color:var(--green-dark); }
+  .kpi span{ font-size:11.5px; color:#6a6a5e; }
+  .charts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+  .chartbox{ border:1px solid var(--line); border-radius:8px; padding:8px; background:#fff; }
+  .chartbox h3{ margin:0 0 6px; font-size:13px; color:var(--green-dark); }
+  .chartbox .cv{ position:relative; height:240px; }
+  .nodata{ font-size:12px; color:#8a8a7e; padding:30px 0; text-align:center; }
+  table.days{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.days th, table.days td{ border-bottom:1px solid var(--line); padding:6px 4px; text-align:left; }
+  .warn{ background:#fff3d6; border:1px solid var(--amber); border-radius:8px; padding:10px; font-size:13px; margin-bottom:14px; }
+  .sample{ background:#e8f1e5; border:1px solid var(--green); border-radius:8px; padding:10px; font-size:13px; margin-bottom:14px; }
+  .hint{ font-size:12px; color:#6a6a5e; margin:8px 0 0; }
+  a.back{ color:#cfe6c8; font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Monthly Poultry Records</h1>
+  <p>CPL Poultry Division — everything you entered, one month, one PDF</p>
+  <p><a class="back" href="index.html">← All forms</a></p>
+</header>
+<div class="wrap">
+
+  <div id="backup-warn" class="warn" style="display:none;"></div>
+  <div id="sample-note" class="sample" style="display:none;">You are looking at <b>SAMPLE DATA</b> (made up, not saved anywhere). This is only to show how the charts and the PDF will look. Press "Show my real records" to go back.</div>
+
+  <div class="card">
+    <h2>Choose the month</h2>
+    <label for="month">Month</label>
+    <input type="month" id="month">
+    <div class="btns">
+      <button class="primary" id="btn-pdf" onclick="generateMonthlyPDF()">Generate Monthly PDF</button>
+      <button class="amber" id="btn-sample" onclick="toggleSample()">Preview with sample data</button>
+    </div>
+    <p class="hint" id="pdf-hint"></p>
+  </div>
+
+  <div class="card">
+    <h2>Month summary</h2>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="card">
+    <h2>Graphs</h2>
+    <div class="charts" id="charts"></div>
+  </div>
+
+  <div class="card">
+    <h2>Days recorded</h2>
+    <div style="overflow-x:auto;"><table class="days" id="days-table"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Backup (important)</h2>
+    <p class="hint" style="margin-top:0;">Your records live only inside this browser on this device. If you clear the browser data or change phones, they are gone. Download a backup file once a month and keep it safe (e.g. email it to yourself).</p>
+    <div class="btns">
+      <button class="primary" onclick="exportBackup()">Download backup file</button>
+      <button onclick="document.getElementById('import-file').click()">Restore from backup file</button>
+      <input type="file" id="import-file" accept=".json,application/json" style="display:none;" onchange="importBackup(event)">
+    </div>
+    <p class="hint" id="backup-info"></p>
+  </div>
+</div>
+
+<script>
+// ============================ DATABASE ============================
+const CPL_DB_KEY = "cpl_records_v1";
+const CPL_BACKUP_KEY = "cpl_last_backup";
+function cplDbLoad(){
+  try{ const r = JSON.parse(localStorage.getItem(CPL_DB_KEY)); if(r && r.records) return r; }catch(e){}
+  return { version:1, records:{} };
+}
+function cplDbSaveAll(db){ try{ localStorage.setItem(CPL_DB_KEY, JSON.stringify(db)); return true; }catch(e){ alert("Could not save (storage full or blocked)."); return false; } }
+
+// ============================ HELPERS ============================
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const C = { green:"#2b4127", leaf:"#7aa36f", amber:"#c98a2c", red:"#b3261e", blue:"#2f6f8f", grey:"#8a8a7e", light:"#e0b873", pink:"#c46a7a" };
+function n(v){ if(v===null||v===undefined||v==="") return null; const x=parseFloat(v); return isNaN(x)?null:x; }
+function sum(a){ let s=0,c=0; a.forEach(x=>{ if(x!==null){ s+=x; c++; } }); return c?s:null; }
+function avg(a){ const b=a.filter(x=>x!==null); return b.length? b.reduce((p,q)=>p+q,0)/b.length : null; }
+function r1(x){ return x===null||x===undefined ? null : Math.round(x*10)/10; }
+function fmt(x,d){ if(x===null||x===undefined) return "—"; return Number(x).toLocaleString("en-US",{maximumFractionDigits:(d===undefined?1:d)}); }
+function pad(x){ return String(x).padStart(2,"0"); }
+function daysInMonth(ym){ const [y,m]=ym.split("-").map(Number); return new Date(y,m,0).getDate(); }
+function monthTitle(ym){ const [y,m]=ym.split("-").map(Number); return MONTHS[m-1]+" "+y; }
+function niceDate(d){ const [y,m,day]=d.split("-"); return day+"/"+m+"/"+y.slice(2); }
+
+// ============================ DAILY AGGREGATION ============================
+function aggregate(date, rec){
+  const d = { date:date, hasChecklist:!!rec.checklist, hasFeedStock:!!rec.feedstock };
+  const c = rec.checklist && rec.checklist.data ? rec.checklist.data : null;
+  if(c){
+    d.egg9=n(c.egg9); d.egg12=n(c.egg12); d.egg4=n(c.egg4); d.eggTotal=n(c.eggTotal);
+    d.eggHatchery=n(c.eggHatchery); d.eggTable=n(c.eggTable); d.eggSmash=n(c.eggSmash);
+    d.eggStore=n(c.eggCurrentStorage); d.eggTotalStore=n(c.eggTotalStorage);
+    d.hatchPct = (d.eggTotal && d.eggHatchery!==null) ? d.eggHatchery/d.eggTotal*100 : null;
+    d.remM=n(c.stockRemM); d.remF=n(c.stockRemF); d.remT=n(c.stockTotal);
+    let mM=0, mF=0, mU=0, anyM=false;
+    (c.vacc||[]).forEach(v=>{ const m=n(v.mortality); if(m===null) return; anyM=true; if(v.gender==="Male") mM+=m; else if(v.gender==="Female") mF+=m; else mU+=m; });
+    d.mortM = anyM?mM:null; d.mortF = anyM?mF:null; d.mortU = anyM?mU:null; d.mortT = anyM?mM+mF+mU:null;
+    const fm=[],ff=[],ft=[],wa=[],wp=[],wc=[];
+    (c.feed||[]).forEach(f=>{ fm.push(n(f.male)); ff.push(n(f.female)); ft.push(n(f.total)); wa.push(n(f.waterAM)); wp.push(n(f.waterPM)); wc.push(n(f.consumption)); });
+    d.feedM=sum(fm); d.feedF=sum(ff); d.feedT=sum(ft); if(d.feedT===null && (d.feedM!==null||d.feedF!==null)) d.feedT=(d.feedM||0)+(d.feedF||0);
+    d.waterAM=sum(wa); d.waterPM=sum(wp); d.water=sum(wc);
+    const hAMt=[],hPMt=[],hAMh=[],hPMh=[];
+    (c.house||[]).forEach(h=>{ const am = h.time==="Morning"; (am?hAMt:hPMt).push(n(h.temp)); (am?hAMh:hPMh).push(n(h.hum)); });
+    d.hTempAM=avg(hAMt); d.hTempPM=avg(hPMt); d.hHumAM=avg(hAMh); d.hHumPM=avg(hPMh);
+    const S={tAM:[],tPM:[],hAM:[],hPM:[]}, H={tAM:[],tPM:[],hAM:[],hPM:[]}, EG={am:[],pm:[]};
+    (c.setter||[]).forEach(s=>{
+      const T = /^Hatcher/i.test(s.name||"") ? H : S;
+      T.tAM.push(n(s.tempAM)); T.tPM.push(n(s.tempPM)); T.hAM.push(n(s.humAM)); T.hPM.push(n(s.humPM));
+      EG.am.push(n(s.eggAM)); EG.pm.push(n(s.eggPM));
+    });
+    d.sTempAM=avg(S.tAM); d.sTempPM=avg(S.tPM); d.sHumAM=avg(S.hAM); d.sHumPM=avg(S.hPM);
+    d.hcTempAM=avg(H.tAM); d.hcTempPM=avg(H.tPM); d.hcHumAM=avg(H.hAM); d.hcHumPM=avg(H.hPM);
+    d.eggTempAM=avg(EG.am); d.eggTempPM=avg(EG.pm);
+    let faults=0, anyFan=false;
+    (c.fan||[]).forEach(f=>{ if(f.ok||f.status) anyFan=true; if(f.ok==="Faulty") faults++; });
+    d.fanFaults = anyFan ? faults : null;
+    d.raw = c;
+  }
+  const h = rec.hatchery;
+  if(h){
+    d.hasHatchery = true; d.hBatches = (h.batches||[]).filter(b=>Object.keys(b).some(k=>k!=="fertilePct" && b[k]!=="" && b[k]!==undefined)); d.hCount = d.hBatches.length;
+    ["eggSet","infertile","damage","bomb","fertile","hatchChicks","mortality","cull","dic","salable","unhatched"].forEach(k=>{
+      d["h_"+k] = d.hBatches.length ? sum(d.hBatches.map(b=>n(b[k]))) : null;
+    });
+    d.hPct = (d.h_fertile && d.h_hatchChicks!==null) ? d.h_hatchChicks/d.h_fertile*100 : null;
+  }
+  const f = rec.feedstock;
+  if(f){ d.stockKg = n(f.grandTotal); d.stockRows = f.rows||[]; }
+  return d;
+}
+let SAMPLE = false;
+function sourceRecords(ym){
+  if(SAMPLE) return sampleRecords(ym);
+  return cplDbLoad().records;
+}
+function monthDays(ym){
+  const recs = sourceRecords(ym), out = [];
+  Object.keys(recs).sort().forEach(date=>{ if(date.slice(0,7)===ym) out.push(aggregate(date, recs[date])); });
+  return out;
+}
+function summarize(days){
+  const S = {};
+  S.count = days.length;
+  const tot = k=>sum(days.map(d=>d[k]===undefined?null:d[k]));
+  S.eggs=tot("eggTotal"); S.hatch=tot("eggHatchery"); S.table=tot("eggTable"); S.smash=tot("eggSmash");
+  S.eggDays = days.filter(d=>d.eggTotal!==null && d.eggTotal!==undefined).length;
+  S.avgEggs = S.eggs!==null && S.eggDays ? S.eggs/S.eggDays : null;
+  S.hatchPct = S.eggs ? (S.hatch||0)/S.eggs*100 : null;
+  S.mortM=tot("mortM"); S.mortF=tot("mortF"); S.mortT=tot("mortT");
+  S.feed=tot("feedT"); S.feedM=tot("feedM"); S.feedF=tot("feedF"); S.water=tot("water"); S.stockKg=tot("stockKg");
+  S.hSet=tot("h_eggSet"); S.hFertile=tot("h_fertile"); S.hHatch=tot("h_hatchChicks"); S.hSalable=tot("h_salable");
+  S.hPct = S.hFertile ? (S.hHatch||0)/S.hFertile*100 : null;
+  S.hBatches = tot("hCount");
+  S.fanDays = days.filter(d=>d.fanFaults>0).length;
+  S.tempAM=avg(days.map(d=>d.hTempAM===undefined?null:d.hTempAM)); S.tempPM=avg(days.map(d=>d.hTempPM===undefined?null:d.hTempPM));
+  let last=null; days.forEach(d=>{ if(d.remM!==null && d.remM!==undefined || d.remF!==null && d.remF!==undefined) last=d; });
+  S.remM = last?last.remM:null; S.remF = last?last.remF:null; S.remT = last?last.remT:null;
+  return S;
+}
+
+// ============================ CHARTS ============================
+function seriesFor(ym, days, key){
+  const N = daysInMonth(ym), arr = new Array(N).fill(null);
+  days.forEach(d=>{ const v=d[key]; arr[parseInt(d.date.slice(8),10)-1] = (v===undefined||v===null)?null:r1(v); });
+  return arr;
+}
+function chartDefs(ym, days){
+  const N = daysInMonth(ym), labels = Array.from({length:N},(_,i)=>String(i+1));
+  const s = k=>seriesFor(ym,days,k);
+  const bar = (label,data,color,extra)=>Object.assign({type:"bar",label,data,backgroundColor:color,borderColor:color,borderWidth:1},extra||{});
+  const line = (label,data,color,extra)=>Object.assign({type:"line",label,data,borderColor:color,backgroundColor:color,borderWidth:2.5,pointRadius:3,tension:.25,spanGaps:true},extra||{});
+  const cum = (arr)=>{ let t=0; return arr.map(v=>{ if(v!==null) t+=v; return t||(v===null?null:0); }); };
+  const mm=s("mortM"), mf=s("mortF"), mt=s("mortT");
+  const defs = [
+    {title:"Egg production per day", yTitle:"Eggs", datasets:[bar("Total eggs",s("eggTotal"),C.green), line("Hatchery eggs",s("eggHatchery"),C.amber)]},
+    {title:"Egg breakdown (Hatchery / Table / Smash)", yTitle:"Eggs", stacked:true, datasets:[bar("Hatchery",s("eggHatchery"),C.green),bar("Table",s("eggTable"),C.amber),bar("Smash",s("eggSmash"),C.red)]},
+    {title:"Eggs collected by time of day", yTitle:"Eggs", stacked:true, datasets:[bar("9:00am",s("egg9"),C.leaf),bar("12:00pm",s("egg12"),C.amber),bar("4:00pm",s("egg4"),C.blue)]},
+    {title:"Egg storage", yTitle:"Eggs", datasets:[line("Current storage",s("eggStore"),C.blue),line("Total storage",s("eggTotalStore"),C.green)]},
+    {title:"Hatchery eggs as % of total eggs", yTitle:"%", datasets:[line("Hatchery %",s("hatchPct"),C.amber)]},
+    {title:"Mortality per day", yTitle:"Birds", datasets:[bar("Male",mm,C.blue),bar("Female",mf,C.pink),line("Cumulative total",cum(mt),C.red,{yAxisID:"y1"})], y1:"Cumulative"},
+    {title:"Remaining birds", yTitle:"Male", datasets:[line("Male (left)",s("remM"),C.blue),line("Female (right)",s("remF"),C.pink,{yAxisID:"y1"}),line("Total (right)",s("remT"),C.green,{yAxisID:"y1"})], y1:"Female / Total"},
+    {title:"Feed given per day", yTitle:"Kg", stacked:true, datasets:[bar("Male kg",s("feedM"),C.blue),bar("Female kg",s("feedF"),C.pink)]},
+    {title:"Water consumption", yTitle:"Litres", datasets:[line("Litres",s("water"),C.blue)]},
+    {title:"House temperature (average)", yTitle:"°C", datasets:[line("Morning",s("hTempAM"),C.amber),line("Afternoon",s("hTempPM"),C.red)]},
+    {title:"House humidity (average)", yTitle:"%", datasets:[line("Morning",s("hHumAM"),C.blue),line("Afternoon",s("hHumPM"),C.green)]},
+    {title:"Setter & Hatcher temperature (average)", yTitle:"°C", datasets:[line("Setters AM",s("sTempAM"),C.amber),line("Setters PM",s("sTempPM"),C.red),line("Hatchers AM",s("hcTempAM"),C.blue),line("Hatchers PM",s("hcTempPM"),C.green)]},
+    {title:"Setter & Hatcher humidity (average)", yTitle:"%", datasets:[line("Setters AM",s("sHumAM"),C.amber),line("Setters PM",s("sHumPM"),C.red),line("Hatchers AM",s("hcHumAM"),C.blue),line("Hatchers PM",s("hcHumPM"),C.green)]},
+    {title:"Egg temperature in setters (average)", yTitle:"°C", datasets:[line("Morning",s("eggTempAM"),C.amber),line("Afternoon",s("eggTempPM"),C.red)]},
+    {title:"Hatchery: eggs set, fertile, hatched & salable", yTitle:"Eggs / chicks", datasets:[bar("Egg set",s("h_eggSet"),C.green),bar("Candling fertile",s("h_fertile"),C.blue),bar("Hatch chicks",s("h_hatchChicks"),C.amber),bar("Salable chicks",s("h_salable"),C.red)]},
+    {title:"Hatchery: hatch % of fertile eggs", yTitle:"%", datasets:[line("Hatch % of fertile",s("hPct"),C.green)]},
+    {title:"Hatchery: losses (infertile, damage, bomb, unhatched)", yTitle:"Eggs", stacked:true, datasets:[bar("Infertile",s("h_infertile"),C.grey),bar("Damage",s("h_damage"),C.amber),bar("Bomb",s("h_bomb"),C.red),bar("Unhatched",s("h_unhatched"),C.pink)]},
+    {title:"Hatchery: chick mortality, cull & DIC", yTitle:"Chicks", stacked:true, datasets:[bar("Mortality",s("h_mortality"),C.red),bar("Cull",s("h_cull"),C.amber),bar("DIC",s("h_dic"),C.blue)]},
+    {title:"Faulty fans per day", yTitle:"Fans", datasets:[bar("Faulty fans",s("fanFaults"),C.red)], integer:true},
+    {title:"Feed stock recorded (Feed Stock Calculator)", yTitle:"Kg", datasets:[bar("Kg",s("stockKg"),C.green)]}
+  ];
+  defs.forEach(d=>{ d.labels = labels; d.has = d.datasets.some(ds=>ds.data.some(v=>v!==null)); });
+  return defs;
+}
+const whiteBg = { id:"whiteBg", beforeDraw(chart){ const ctx=chart.ctx; ctx.save(); ctx.globalCompositeOperation="destination-over"; ctx.fillStyle="#fff"; ctx.fillRect(0,0,chart.width,chart.height); ctx.restore(); } };
+function chartConfig(def, big){
+  const fs = big ? 15 : 11;
+  const scales = {
+    x:{ stacked:!!def.stacked, title:{display:true,text:"Day of the month",font:{size:fs}}, ticks:{font:{size:fs}}, grid:{display:false} },
+    y:{ stacked:!!def.stacked, beginAtZero:true, title:{display:true,text:def.yTitle,font:{size:fs}}, ticks:{font:{size:fs}, precision: def.integer?0:undefined, stepSize: def.integer?1:undefined} }
+  };
+  if(def.y1) scales.y1 = { position:"right", beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:def.y1,font:{size:fs}}, ticks:{font:{size:fs}} };
+  const opts = {
+    animation:false, responsive:!big, maintainAspectRatio:false,
+    plugins:{ legend:{ position:"bottom", labels:{ font:{size:fs}, boxWidth:big?18:12 } }, title:{display:false} },
+    scales
+  };
+  return { data:{ labels:def.labels, datasets:def.datasets.map(d=>Object.assign({},d)) }, options:opts, plugins:[whiteBg] };
+}
+let screenCharts = [];
+function renderCharts(ym, days){
+  screenCharts.forEach(c=>{ try{ c.destroy(); }catch(e){} }); screenCharts = [];
+  const box = document.getElementById("charts"); box.innerHTML = "";
+  const defs = chartDefs(ym, days);
+  defs.forEach(def=>{
+    const wrap = document.createElement("div"); wrap.className="chartbox";
+    const h = document.createElement("h3"); h.textContent = def.title; wrap.appendChild(h);
+    if(!def.has){ const nd=document.createElement("div"); nd.className="nodata"; nd.textContent="No figures entered for this graph yet."; wrap.appendChild(nd); box.appendChild(wrap); return; }
+    if(typeof Chart === "undefined"){ const nd=document.createElement("div"); nd.className="nodata"; nd.textContent="Graphs need the chart library. Connect to the internet once and reload."; wrap.appendChild(nd); box.appendChild(wrap); return; }
+    const cv = document.createElement("div"); cv.className="cv"; const canvas = document.createElement("canvas"); cv.appendChild(canvas); wrap.appendChild(cv); box.appendChild(wrap);
+    const cfg = chartConfig(def,false);
+    screenCharts.push(new Chart(canvas.getContext("2d"), { type:"bar", data:cfg.data, options:cfg.options, plugins:cfg.plugins }));
+  });
+}
+function chartImage(def){
+  const canvas = document.createElement("canvas"); canvas.width=900; canvas.height=480;
+  const cfg = chartConfig(def,true);
+  const ch = new Chart(canvas.getContext("2d"), { type:"bar", data:cfg.data, options:cfg.options, plugins:cfg.plugins });
+  const url = canvas.toDataURL("image/png",1.0);
+  ch.destroy();
+  return url;
+}
+
+// ============================ SCREEN ============================
+function currentMonth(){ return document.getElementById("month").value; }
+function kpi(val,label){ return `<div class="kpi"><b>${val}</b><span>${label}</span></div>`; }
+function refresh(){
+  const ym = currentMonth();
+  document.getElementById("sample-note").style.display = SAMPLE?"block":"none";
+  document.getElementById("btn-sample").textContent = SAMPLE ? "Show my real records" : "Preview with sample data";
+  if(!ym) return;
+  const days = monthDays(ym), S = summarize(days);
+  document.getElementById("btn-pdf").disabled = days.length===0;
+  document.getElementById("pdf-hint").textContent = days.length ? ("The PDF will contain "+days.length+" recorded day(s) for "+monthTitle(ym)+(SAMPLE?" (SAMPLE DATA).":".")) : "No records saved for this month yet. Fill in the Daily Operation Checklist (with a Date) and it will appear here automatically.";
+  document.getElementById("kpis").innerHTML = days.length ? [
+    kpi(S.count,"Days recorded"), kpi(fmt(S.eggs),"Total eggs"), kpi(fmt(S.avgEggs),"Average eggs per day"),
+    kpi(fmt(S.hatch)+(S.hatchPct!==null?" ("+fmt(S.hatchPct)+"%)":""),"Hatchery eggs"), kpi(fmt(S.table),"Table eggs"), kpi(fmt(S.smash),"Smash eggs"),
+    kpi(fmt(S.mortT),"Total mortality"), kpi(fmt(S.mortM)+" M / "+fmt(S.mortF)+" F","Male / Female mortality"),
+    kpi(fmt(S.remT),"Birds remaining (latest)"), kpi(fmt(S.feed),"Feed given (kg)"), kpi(fmt(S.water),"Water (litres)"), kpi(fmt(S.stockKg),"Feed stock recorded (kg)"),
+    kpi(fmt(S.hBatches),"Hatchery batches"), kpi(fmt(S.hSet),"Eggs set"), kpi(fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"), kpi(fmt(S.hSalable),"Salable chicks")
+  ].join("") : '<div class="nodata" style="grid-column:1/-1;">Nothing to summarise yet.</div>';
+  renderCharts(ym, days);
+  const t = document.getElementById("days-table");
+  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Mortality</th><th></th></tr></thead>";
+  const tb = document.createElement("tbody");
+  days.forEach(d=>{
+    const tr = document.createElement("tr");
+    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.mortT===undefined?null:d.mortT)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    const td = document.createElement("td");
+    if(!SAMPLE){ const b=document.createElement("button"); b.className="danger"; b.textContent="Delete"; b.style.padding="4px 8px"; b.onclick=()=>deleteDay(d.date); td.appendChild(b); }
+    tr.appendChild(td); tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  backupInfo();
+}
+function deleteDay(date){
+  if(!confirm("Delete ALL saved records for "+niceDate(date)+"? This cannot be undone.")) return;
+  const db = cplDbLoad(); delete db.records[date]; cplDbSaveAll(db); refresh();
+}
+function toggleSample(){ SAMPLE = !SAMPLE; refresh(); }
+
+// ============================ BACKUP ============================
+function exportBackup(){
+  const db = cplDbLoad();
+  const blob = new Blob([JSON.stringify(db)], {type:"application/json"});
+  const a = document.createElement("a"); const t = new Date();
+  a.href = URL.createObjectURL(blob);
+  a.download = `${pad(t.getDate())} ${MONTHS[t.getMonth()]} ${t.getFullYear()} CPL Records Backup.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  try{ localStorage.setItem(CPL_BACKUP_KEY, new Date().toISOString()); }catch(e){}
+  backupInfo();
+}
+function importBackup(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const inc = JSON.parse(rd.result);
+      if(!inc || !inc.records) throw new Error("bad");
+      const db = cplDbLoad(); let added=0, updated=0;
+      Object.keys(inc.records).forEach(date=>{
+        const src = inc.records[date]; if(!db.records[date]) db.records[date] = {};
+        Object.keys(src).forEach(sec=>{
+          const cur = db.records[date][sec];
+          if(!cur){ db.records[date][sec]=src[sec]; added++; }
+          else if((src[sec].updated||"") > (cur.updated||"")){ db.records[date][sec]=src[sec]; updated++; }
+        });
+      });
+      cplDbSaveAll(db);
+      alert("Backup restored. New entries: "+added+", updated entries: "+updated+".");
+      SAMPLE=false; refresh();
+    }catch(e){ alert("That file is not a valid CPL records backup."); }
+    ev.target.value = "";
+  };
+  rd.readAsText(f);
+}
+function backupInfo(){
+  let last = null; try{ last = localStorage.getItem(CPL_BACKUP_KEY); }catch(e){}
+  const count = Object.keys(cplDbLoad().records).length;
+  document.getElementById("backup-info").textContent = (last ? "Last backup: "+new Date(last).toLocaleDateString("en-GB") : "You have not downloaded a backup yet.") + " • Days stored on this device: " + count;
+  const w = document.getElementById("backup-warn");
+  const old = !last || (Date.now()-new Date(last).getTime()) > 14*86400000;
+  if(count>0 && old){ w.style.display="block"; w.textContent = "Reminder: download a backup file (bottom of this page). Your records are only stored on this device."; } else w.style.display="none";
+}
+
+// ============================ SAMPLE DATA ============================
+function sampleRecords(ym){
+  let seed = 12345; const rnd = ()=>{ seed = (seed*1103515245+12345) & 0x7fffffff; return seed/0x7fffffff; };
+  const [y,m] = ym.split("-").map(Number), N = daysInMonth(ym), recs = {};
+  let remM = 520, remF = 4200;
+  for(let day=1; day<=N; day++){
+    const date = `${y}-${pad(m)}-${pad(day)}`;
+    const e9=Math.round(900+rnd()*200), e12=Math.round(500+rnd()*150), e4=Math.round(250+rnd()*100), tot=e9+e12+e4;
+    const hatch=Math.round(tot*(0.78+rnd()*0.08)), smash=Math.round(8+rnd()*25), table=tot-hatch-smash;
+    const mm=Math.round(rnd()*3), mf=Math.round(rnd()*9); remM-=mm; remF-=mf;
+    const fan = [0,1,2,3].map(i=>({name:"Fan "+(i+1), status:"ON", ok:(rnd()<0.06?"Faulty":"OK"), remarks:""}));
+    const setter = ["Setter 1","Setter 2","Setter 3","Setter 4","Hatcher 1","Hatcher 2","Hatcher 3"].map((nm,i)=>({
+      name:nm, tempAM:r1(37.4+rnd()*0.7), tempPM:r1(37.4+rnd()*0.7), humAM:Math.round(50+rnd()*8+(i>3?12:0)), humPM:Math.round(50+rnd()*8+(i>3?12:0)), eggAM:r1(37.3+rnd()*0.8), eggPM:r1(37.3+rnd()*0.8), remarks:""}));
+    const house=[]; [1,2].forEach(h=>{ ["Morning","Afternoon"].forEach(t=>house.push({house:String(h),time:t,temp:r1((t==="Morning"?25:30)+rnd()*3),hum:Math.round(60+rnd()*15),ok:"OK",remarks:""})); });
+    const fm=Math.round(55+rnd()*8), ff=Math.round(420+rnd()*40);
+    const wAM=Math.round(1000+rnd()*50), wPM=wAM+Math.round(400+rnd()*150);
+    const vacc=[]; if(mm) vacc.push({house:"1",vaccine:"",mortality:String(mm),gender:"Male",finding:"Weak bird",action:"Isolated and monitored"});
+    if(mf) vacc.push({house:"2",vaccine:"",mortality:String(mf),gender:"Female",finding:"Found dead",action:"Postmortem done"});
+    recs[date] = { checklist:{ data:{ date, egg9:String(e9), egg12:String(e12), egg4:String(e4), eggTotal:String(tot), eggHatchery:String(hatch), eggSmash:String(smash), eggTable:String(table),
+      eggCurrentStorage:String(Math.round(1500+rnd()*500)), eggTotalStorage:String(Math.round(2500+rnd()*800)), stockRemM:String(remM), stockRemF:String(remF), stockTotal:String(remM+remF),
+      vacc, feed:[{house:"1",type:"Breeder",male:String(fm),female:String(ff),total:String(fm+ff),waterAM:String(wAM),waterPM:String(wPM),consumption:String(wPM-wAM)}], house, setter, fan } },
+      feedstock: (day%7===1) ? { rows:[{name:"Breeder",bags:30,kgPerBag:40,totalKg:1200},{name:"Starter",bags:10,kgPerBag:40,totalKg:400}], grandTotal:1600 } : undefined };
+    if(!recs[date].feedstock) delete recs[date].feedstock;
+    if(day%7===3){
+      const set=Math.round(9000+rnd()*1500), inf=Math.round(set*0.08), dam=Math.round(set*0.01), bomb=Math.round(set*0.02), fer=set-inf-dam-bomb, hc=Math.round(fer*(0.84+rnd()*0.06)), mo=Math.round(hc*0.01), cu=Math.round(hc*0.02), dic=Math.round(hc*0.005), sal=hc-mo-cu-dic;
+      recs[date].hatchery = { batches:[{batch:String(100+day),eggSet:String(set),time:"08:00",setDate:`${y}-${pad(m)}-${pad(Math.max(1,day-21))}`,transferDate:`${y}-${pad(m)}-${pad(Math.max(1,day-3))}`,hatchDate:date,infertile:String(inf),damage:String(dam),bomb:String(bomb),fertile:String(fer),hatchChicks:String(hc),mortality:String(mo),cull:String(cu),dic:String(dic),salable:String(sal),unhatched:String(fer-hc),fertilePct:Math.round(hc/fer*100)+"%"}] };
+    }
+  }
+  return recs;
+}
+
+// ============================ PDF ============================
+function generateMonthlyPDF(){
+  const ym = currentMonth(); const days = monthDays(ym);
+  if(!days.length){ alert("No records for this month."); return; }
+  if(!window.jspdf || !window.jspdf.jsPDF){ alert("The PDF library did not load. Connect to the internet once, reload this page and try again."); return; }
+  const defs = chartDefs(ym, days).filter(d=>d.has);
+  if(defs.length && typeof Chart === "undefined"){ alert("The chart library did not load. Connect to the internet once, reload and try again."); return; }
+  const S = summarize(days), title = monthTitle(ym);
+  const doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4", orientation:"portrait" });
+  const GREEN=[43,65,39], AMBER=[201,138,44];
+  const M = 28;
+  const pw = ()=>doc.internal.pageSize.getWidth(), ph = ()=>doc.internal.pageSize.getHeight();
+  function banner(sub){
+    doc.setFillColor(...GREEN); doc.rect(0,0,pw(),44,"F");
+    doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(15);
+    doc.text(title+" — Monthly Poultry Records"+(SAMPLE?" (SAMPLE DATA)":""), M, 20);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+    doc.text("CPL Poultry Division — Coconut Products Limited, Kokopo"+(sub?"   |   "+sub:""), M, 35);
+    doc.setTextColor(0,0,0);
+  }
+  function newPage(orient, sub){
+    origAddPage("a4", orient); banner(sub); return 62;
+  }
+  const tableDefaults = { margin:{left:M,right:M,top:56,bottom:34}, styles:{fontSize:8,cellPadding:3,overflow:"linebreak",valign:"middle"}, headStyles:{fillColor:GREEN,textColor:255,halign:"center"}, footStyles:{fillColor:[240,236,220],textColor:20,fontStyle:"bold"}, alternateRowStyles:{fillColor:[248,246,239]}, rowPageBreak:"avoid", showFoot:"lastPage" };
+  const origAddPage = doc.addPage.bind(doc);
+  function sectionTable(heading, head, body, foot, orient, colStyles){
+    let y = newPage(orient, heading);
+    const startPage = doc.internal.getCurrentPageInfo().pageNumber;
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...GREEN); doc.text(heading, M, y+4); doc.setTextColor(0,0,0);
+    // pages the table adds by itself must keep this section's page orientation
+    doc.addPage = function(f,o){ return origAddPage(f||"a4", o||orient); };
+    const opts = Object.assign({}, tableDefaults, { startY:y+12, head:[head], body, columnStyles:colStyles||{}, styles:Object.assign({},tableDefaults.styles,{halign:"center"}),
+      didDrawPage:(data)=>{ if(data.pageNumber !== startPage) banner(heading+" (continued)"); } });
+    if(foot) opts.foot=[foot];
+    try{ doc.autoTable(opts); } finally { doc.addPage = origAddPage; }
+  }
+  // ---- Page 1: cover & summary (first page) ----
+  banner("Summary");
+  let y = 70;
+  doc.setFont("helvetica","bold"); doc.setFontSize(20); doc.setTextColor(...GREEN); doc.text(title, M, y+10);
+  doc.setFontSize(11); doc.setFont("helvetica","normal"); doc.setTextColor(60,60,60);
+  doc.text(days.length+" day(s) of records  •  First: "+niceDate(days[0].date)+"  •  Last: "+niceDate(days[days.length-1].date), M, y+28);
+  if(SAMPLE){ doc.setTextColor(...[179,38,30]); doc.setFont("helvetica","bold"); doc.text("SAMPLE DATA — made up figures, for layout preview only.", M, y+44); doc.setFont("helvetica","normal"); }
+  doc.setTextColor(0,0,0);
+  const kp = [
+    ["Days recorded", String(S.count)],
+    ["Total eggs collected", fmt(S.eggs)], ["Average eggs per recorded day", fmt(S.avgEggs)],
+    ["Hatchery eggs", fmt(S.hatch)+(S.hatchPct!==null?"  ("+fmt(S.hatchPct)+"% of total)":"")], ["Table eggs", fmt(S.table)], ["Smash eggs", fmt(S.smash)],
+    ["Total mortality", fmt(S.mortT)], ["Mortality — Male", fmt(S.mortM)], ["Mortality — Female", fmt(S.mortF)],
+    ["Remaining birds (latest) — Male / Female / Total", fmt(S.remM)+" / "+fmt(S.remF)+" / "+fmt(S.remT)],
+    ["Feed given (kg) — Male / Female / Total", fmt(S.feedM)+" / "+fmt(S.feedF)+" / "+fmt(S.feed)],
+    ["Water consumption (litres)", fmt(S.water)], ["Feed stock recorded (kg)", fmt(S.stockKg)],
+    ["Average house temperature — Morning / Afternoon (°C)", fmt(S.tempAM)+" / "+fmt(S.tempPM)], ["Days with a faulty fan", String(S.fanDays)],
+    ["Hatchery batches recorded", fmt(S.hBatches)], ["Eggs set / Candling fertile", fmt(S.hSet)+" / "+fmt(S.hFertile)], ["Chicks hatched / Salable chicks", fmt(S.hHatch)+" / "+fmt(S.hSalable)], ["Hatch % of fertile eggs", S.hPct===null?"—":fmt(S.hPct)+"%"]
+  ];
+  doc.autoTable(Object.assign({}, tableDefaults, { startY:y+58, head:[["Measure","Month figure"]], body:kp, columnStyles:{0:{cellWidth:300},1:{halign:"right",fontStyle:"bold"}}, styles:{fontSize:10,cellPadding:5}, margin:{left:M,right:M,top:56,bottom:34} }));
+  let yy = doc.lastAutoTable.finalY + 14;
+  doc.setFontSize(9); doc.setTextColor(90,90,90);
+  doc.text("Contents: daily tables (eggs, birds & mortality, feed & water, environment), graphs, vaccination & mortality log, equipment remarks, feed stock records.", M, yy, {maxWidth:pw()-2*M});
+  doc.setTextColor(0,0,0);
+
+  // ---- Landscape daily tables ----
+  const hasEgg = days.some(d=>d.eggTotal!==undefined && d.eggTotal!==null);
+  const dayRows = (fn)=>days.filter(d=>d.hasChecklist).map(fn);
+  const E = (v)=>fmt(v===undefined?null:v);
+  const T = (k)=>fmt(sum(days.map(d=>d[k]===undefined?null:d[k])));
+  const lastOf = (k)=>{ let v=null; days.forEach(d=>{ if(d[k]!==undefined && d[k]!==null) v=d[k]; }); return fmt(v); };
+  if(days.some(d=>d.hasChecklist)){
+    sectionTable("Daily Egg Production", ["Date","9:00am","12:00pm","4:00pm","Total Eggs","Hatchery","Table","Smash","Hatchery %","Current Storage","Total Storage"],
+      dayRows(d=>[niceDate(d.date),E(d.egg9),E(d.egg12),E(d.egg4),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),d.hatchPct===null||d.hatchPct===undefined?"—":fmt(d.hatchPct)+"%",E(d.eggStore),E(d.eggTotalStore)]),
+      ["TOTAL",T("egg9"),T("egg12"),T("egg4"),T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),S.hatchPct===null?"—":fmt(S.hatchPct)+"%","Last: "+lastOf("eggStore"),"Last: "+lastOf("eggTotalStore")], "landscape");
+    let cumT = 0;
+    sectionTable("Birds & Mortality", ["Date","Mortality Male","Mortality Female","Not specified","Total Mortality","Cumulative","Remaining Male","Remaining Female","Remaining Total"],
+      dayRows(d=>{ if(d.mortT!==null && d.mortT!==undefined) cumT+=d.mortT; return [niceDate(d.date),E(d.mortM),E(d.mortF),E(d.mortU),E(d.mortT),fmt(cumT),E(d.remM),E(d.remF),E(d.remT)]; }),
+      ["TOTAL",T("mortM"),T("mortF"),T("mortU"),T("mortT"),fmt(cumT),"Last: "+lastOf("remM"),"Last: "+lastOf("remF"),"Last: "+lastOf("remT")], "landscape");
+    sectionTable("Feed & Water", ["Date","Feed Male (kg)","Feed Female (kg)","Total Feed (kg)","Water Reading AM","Water Reading PM","Consumption (L)","Feed Stock Recorded (kg)"],
+      days.map(d=>[niceDate(d.date),E(d.feedM),E(d.feedF),E(d.feedT),E(d.waterAM),E(d.waterPM),E(d.water),E(d.stockKg)]),
+      ["TOTAL",T("feedM"),T("feedF"),T("feedT"),"","",T("water"),T("stockKg")], "landscape");
+    sectionTable("House, Setter & Hatcher Environment (daily averages)", ["Date","House °C AM","House °C PM","House % AM","House % PM","Setter °C AM","Setter °C PM","Hatcher °C AM","Hatcher °C PM","Setter % AM","Setter % PM","Hatcher % AM","Hatcher % PM","Egg °C AM","Egg °C PM","Faulty Fans"],
+      dayRows(d=>[niceDate(d.date),E(d.hTempAM),E(d.hTempPM),E(d.hHumAM),E(d.hHumPM),E(d.sTempAM),E(d.sTempPM),E(d.hcTempAM),E(d.hcTempPM),E(d.sHumAM),E(d.sHumPM),E(d.hcHumAM),E(d.hcHumPM),E(d.eggTempAM),E(d.eggTempPM),E(d.fanFaults)]),
+      null, "landscape");
+  } else if(days.some(d=>d.hasFeedStock)){
+    sectionTable("Feed Stock Recorded", ["Date","Total (kg)"], days.map(d=>[niceDate(d.date),E(d.stockKg)]), ["TOTAL",T("stockKg")], "portrait");
+  }
+
+  // ---- Hatchery record ----
+  const hDays = days.filter(d=>d.hasHatchery && d.hCount);
+  if(hDays.length){
+    const HT = (k)=>fmt(sum(hDays.map(d=>d[k]===undefined?null:d[k])));
+    sectionTable("Hatchery Record — daily totals", ["Date","Batches","Egg Set","Infertile","Damage","Bomb","Candling Fertile","Hatch Chicks","Mortality","Cull","DIC","Salable","Unhatched","Hatch %"],
+      hDays.map(d=>[niceDate(d.date),String(d.hCount),E(d.h_eggSet),E(d.h_infertile),E(d.h_damage),E(d.h_bomb),E(d.h_fertile),E(d.h_hatchChicks),E(d.h_mortality),E(d.h_cull),E(d.h_dic),E(d.h_salable),E(d.h_unhatched),d.hPct===null||d.hPct===undefined?"—":fmt(d.hPct)+"%"]),
+      ["TOTAL",fmt(S.hBatches),HT("h_eggSet"),HT("h_infertile"),HT("h_damage"),HT("h_bomb"),HT("h_fertile"),HT("h_hatchChicks"),HT("h_mortality"),HT("h_cull"),HT("h_dic"),HT("h_salable"),HT("h_unhatched"),S.hPct===null?"—":fmt(S.hPct)+"%"], "landscape");
+    const bRows = [];
+    hDays.forEach(d=>d.hBatches.forEach(b=>bRows.push([niceDate(d.date),b.batch||"—",b.setDate?niceDate(b.setDate):"—",b.transferDate?niceDate(b.transferDate):"—",b.hatchDate?niceDate(b.hatchDate):"—",fmt(n(b.eggSet)),fmt(n(b.fertile)),fmt(n(b.hatchChicks)),fmt(n(b.salable)),fmt(n(b.unhatched)),b.fertilePct||"—"])));
+    sectionTable("Hatchery Record — batch details", ["Record Date","Batch","Set Date","Transfer Date","Hatch Date","Egg Set","Candling Fertile","Hatch Chicks","Salable","Unhatched","Fertile %"], bRows, null, "landscape");
+  }
+
+  // ---- Graph pages (2 per page, portrait) ----
+  for(let i=0;i<defs.length;i+=2){
+    let gy = newPage("portrait","Graphs");
+    [defs[i],defs[i+1]].forEach(def=>{
+      if(!def) return;
+      doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...GREEN); doc.text(def.title, M, gy+2); doc.setTextColor(0,0,0);
+      const img = chartImage(def), w = pw()-2*M, h = w*480/900;
+      doc.addImage(img,"PNG",M,gy+8,w,h);
+      gy += h + 34;
+    });
+  }
+
+  // ---- Logs ----
+  const vrows = [];
+  days.forEach(d=>{ if(!d.raw) return; (d.raw.vacc||[]).forEach(v=>{ if(v.vaccine||v.mortality||v.finding) vrows.push([niceDate(d.date), v.house||"—", v.vaccine||"—", v.mortality||"—", v.gender||"—", v.finding||"—", v.action||"—"]); }); });
+  if(vrows.length) sectionTable("Vaccination & Mortality Log", ["Date","House","Vaccine","Mortality","Gender","Findings","Action"], vrows, null, "landscape", {5:{halign:"left"},6:{halign:"left"}});
+  const rrows = [];
+  days.forEach(d=>{ if(!d.raw) return;
+    (d.raw.fan||[]).forEach(f=>{ if(f.ok==="Faulty" || f.remarks) rrows.push([niceDate(d.date),"Fan: "+(f.name||""),(f.status||"—")+" / "+(f.ok||"—"),f.remarks||"—"]); });
+    (d.raw.setter||[]).forEach(s=>{ if(s.remarks) rrows.push([niceDate(d.date),s.name||"Setter","",s.remarks]); });
+    (d.raw.house||[]).forEach(h=>{ if(h.remarks || h.ok==="Not OK" || h.ok==="Faulty") rrows.push([niceDate(d.date),"House "+(h.house||"")+" ("+(h.time||"")+")",h.ok||"—",h.remarks||"—"]); });
+  });
+  if(rrows.length) sectionTable("Equipment Faults & Remarks", ["Date","Area","Status","Remarks"], rrows, null, "landscape", {3:{halign:"left"}});
+  const frows = []; let ftot = 0;
+  days.forEach(d=>{ (d.stockRows||[]).forEach(r=>{ frows.push([niceDate(d.date), r.name||"—", fmt(r.bags), fmt(r.kgPerBag), fmt(r.totalKg)]); ftot += r.totalKg||0; }); });
+  if(frows.length) sectionTable("Feed Stock Records (Feed Stock Calculator)", ["Date","Feed","Bags","Kg per Bag","Total (kg)"], frows, ["TOTAL","","","",fmt(ftot)], "portrait");
+
+  // ---- Footer on every page ----
+  const total = doc.getNumberOfPages();
+  for(let p=1;p<=total;p++){
+    doc.setPage(p);
+    doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110,110,110);
+    doc.text(title+" Monthly Poultry Records"+(SAMPLE?" (SAMPLE)":""), M, ph()-14);
+    doc.text("Page "+p+" of "+total, pw()-M, ph()-14, {align:"right"});
+  }
+  doc.save(`${title} Monthly Poultry Records${SAMPLE?" SAMPLE":""}.pdf`);
+}
+
+// ============================ START ============================
+(function init(){
+  const db = cplDbLoad(); const dates = Object.keys(db.records).sort();
+  const now = new Date();
+  let ym = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  if(dates.length && !dates.some(d=>d.slice(0,7)===ym)) ym = dates[dates.length-1].slice(0,7);
+  document.getElementById("month").value = ym;
+  document.getElementById("month").addEventListener("change", refresh);
+  refresh();
+  if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
+    window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+  }
+})();
+</script>
+</body>
+</html>

@@ -350,6 +350,7 @@
 <header>
   <h1>Daily Operation Checklist</h1>
   <p>Breeder Farm & Hatchery — CPL Poultry Division</p>
+  <p id="rec-status" style="font-size:12px;margin-top:6px;"></p>
 </header>
 
 <div class="wrap">
@@ -1074,6 +1075,138 @@ addVaccRow();
 refreshSignatureImages();
 restoreBirdStock();
 
+// ---- Autosave this form into the records database (one record per date) ----
+function cplFieldKey(el, seen){
+  let k = el.id ? "#"+el.id : el.tagName + ":" + el.getAttributeNames().filter(n=>n.startsWith("data-")).sort().map(n=>n+"="+el.getAttribute(n)).join("|");
+  seen[k] = (seen[k]||0) + 1;
+  return k + "~" + seen[k];
+}
+function cplSkipField(el){
+  return el.type === "file" || el.id === "f-date" || el.id === "stock-rem-M" || el.id === "stock-rem-F" || el.id === "stock-total";
+}
+function cplSnapshotFields(){
+  const seen = {}, out = {};
+  document.querySelectorAll("input, select").forEach(el=>{
+    const k = cplFieldKey(el, seen);
+    if(cplSkipField(el)) return;
+    if(el.value !== "") out[k] = el.value;
+  });
+  return out;
+}
+function cplCounts(){
+  const c = { house:houseRowCount, feed:feedRowCount, vacc:vaccRowCount, egg:{} };
+  document.querySelectorAll(".egg-reading-input").forEach(e=>{
+    const s = e.getAttribute("data-eggreading");
+    c.egg[s] = (c.egg[s]||0) + 1;
+  });
+  return c;
+}
+let _cplTimer = null, _cplRestoring = false;
+function cplScheduleSave(){
+  if(_cplRestoring) return;
+  clearTimeout(_cplTimer);
+  _cplTimer = setTimeout(cplSaveNow, 400);
+}
+function cplSaveNow(){
+  const date = document.getElementById("f-date").value;
+  if(!date){ cplStatus("Pick a Date to start saving this record automatically."); return; }
+  let data = null;
+  try{ data = collectData(); }catch(e){}
+  const ok = cplDbPut(date, "checklist", { fields:cplSnapshotFields(), counts:cplCounts(), data:data });
+  if(ok) cplStatus("Saved to records database — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+  else cplStatus("NOT saved — storage problem", false);
+}
+function cplHasTypedData(){
+  return Object.keys(cplSnapshotFields()).length > 0;
+}
+function cplRestore(rec){
+  _cplRestoring = true;
+  try{
+    document.querySelectorAll("input, select").forEach(el=>{ if(!cplSkipField(el)) el.value = ""; });
+    const c = rec.counts || {};
+    while(houseRowCount < (c.house||0)) addHouseRow();
+    while(feedRowCount < (c.feed||0)) addFeedRow();
+    while(vaccRowCount < (c.vacc||0)) addVaccRow();
+    Object.keys(c.egg||{}).forEach(s=>{
+      const [slot, i] = s.split("-");
+      let have = document.querySelectorAll(`[data-eggreading="${s}"]`).length;
+      while(have < c.egg[s]){ addEggReading(slot, i); have++; }
+    });
+    const seen = {}, f = rec.fields || {};
+    document.querySelectorAll("input, select").forEach(el=>{
+      const k = cplFieldKey(el, seen);
+      if(cplSkipField(el)) return;
+      if(f[k] !== undefined) el.value = f[k];
+    });
+    // keep the Remaining birds figure as it is now; this day's mortalities were already taken off it
+    const s = loadBirdStock();
+    const t = vaccMortalityTotals();
+    stockBase.M = s ? (toNumOrNull(s.male)   === null ? null : toNumOrNull(s.male)   + t.male)   : null;
+    stockBase.F = s ? (toNumOrNull(s.female) === null ? null : toNumOrNull(s.female) + t.female) : null;
+    updateBirdStock();
+  } finally { _cplRestoring = false; }
+}
+document.getElementById("f-date").addEventListener("change", ()=>{
+  const date = document.getElementById("f-date").value;
+  if(!date) return;
+  const rec = cplDbGet(date, "checklist");
+  if(rec){
+    if(!cplHasTypedData() || confirm("A saved record already exists for this date. Load it? (OK = load the saved record, Cancel = keep what is on screen and overwrite it)")){
+      cplRestore(rec);
+      cplStatus("Loaded the saved record for this date.");
+      return;
+    }
+  }
+  cplScheduleSave();
+});
+document.addEventListener("input", cplScheduleSave);
+document.addEventListener("change", cplScheduleSave);
+document.addEventListener("click", (e)=>{ if(e.target.closest && e.target.closest("button")) cplScheduleSave(); });
+cplStatus("Pick a Date to start saving this record automatically.");
+
+
+
+// ================= OFFLINE RECORDS DATABASE (shared by the CPL apps) =================
+// Everything is saved inside this browser (localStorage), one record per date.
+const CPL_DB_KEY = "cpl_records_v1";
+let _cplDbWarned = false;
+function cplDbLoad(){
+  try{
+    const r = JSON.parse(localStorage.getItem(CPL_DB_KEY));
+    if(r && r.records) return r;
+  }catch(e){}
+  return { version:1, records:{} };
+}
+function cplDbGet(date, section){
+  const db = cplDbLoad();
+  return (db.records[date] && db.records[date][section]) || null;
+}
+function cplDbPut(date, section, payload){
+  try{
+    const db = cplDbLoad();
+    if(!db.records[date]) db.records[date] = {};
+    payload.updated = new Date().toISOString();
+    db.records[date][section] = payload;
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    return true;
+  }catch(e){
+    if(!_cplDbWarned){
+      _cplDbWarned = true;
+      alert("Could not save to the records database (storage full or blocked). Open the Monthly Records page and download a backup.");
+    }
+    return false;
+  }
+}
+function cplStatus(msg, ok){
+  const el = document.getElementById("rec-status");
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok === false ? "#ffb4ab" : "#cfe6c8";
+}
+if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+
 function val(sel){ const e = document.querySelector(sel); return e ? e.value : ""; }
 
 function collectData(){
@@ -1361,6 +1494,8 @@ function clearForm(){
   document.querySelectorAll("select").forEach(s=>s.value="");
   restoreBirdStock();
   formTouched = false;
+  clearTimeout(_cplTimer);
+  cplStatus("Form cleared. The saved record for that date is still in the database — pick the date again to load it.");
 }
 
 // Warn before an accidental refresh, back button, or tab close wipes anything typed in.

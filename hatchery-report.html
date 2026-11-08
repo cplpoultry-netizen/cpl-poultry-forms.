@@ -161,6 +161,7 @@
 <header>
   <h1>Hatchery Record</h1>
   <p>CPL Poultry Division</p>
+  <p id="rec-status" style="font-size:12px;margin-top:6px;"></p>
 </header>
 
 <div class="wrap">
@@ -189,6 +190,10 @@
   <div class="card">
     <h2>Recorded By</h2>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:130px;">
+        <label style="display:block;font-size:11.5px;color:#5a5a4f;margin-bottom:3px;font-weight:600;">Record Date</label>
+        <input type="date" id="f-date">
+      </div>
       <div style="flex:1;min-width:130px;">
         <label style="display:block;font-size:11.5px;color:#5a5a4f;margin-bottom:3px;font-weight:600;">Name</label>
         <input type="text" id="f-name" placeholder="e.g. Robert Wartovo">
@@ -406,6 +411,99 @@ function refreshAll(){
 
 addBatch();
 
+// ================= OFFLINE RECORDS DATABASE (shared by the CPL apps) =================
+// Everything is saved inside this browser (localStorage), one record per date.
+const CPL_DB_KEY = "cpl_records_v1";
+let _cplDbWarned = false;
+function cplDbLoad(){
+  try{
+    const r = JSON.parse(localStorage.getItem(CPL_DB_KEY));
+    if(r && r.records) return r;
+  }catch(e){}
+  return { version:1, records:{} };
+}
+function cplDbGet(date, section){
+  const db = cplDbLoad();
+  return (db.records[date] && db.records[date][section]) || null;
+}
+function cplDbPut(date, section, payload){
+  try{
+    const db = cplDbLoad();
+    if(!db.records[date]) db.records[date] = {};
+    payload.updated = new Date().toISOString();
+    db.records[date][section] = payload;
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    return true;
+  }catch(e){
+    if(!_cplDbWarned){
+      _cplDbWarned = true;
+      alert("Could not save to the records database (storage full or blocked). Open the Monthly Records page and download a backup.");
+    }
+    return false;
+  }
+}
+function cplStatus(msg, ok){
+  const el = document.getElementById("rec-status");
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok === false ? "#ffb4ab" : "#cfe6c8";
+}
+if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+
+// ---- Autosave into the records database (one record per Record Date) ----
+let _cplTimer = null, _cplRestoring = false;
+function cplHatchHasData(){
+  syncDomToStore();
+  return columnOrder.some(i=>FIELD_ROWS.some(f=>f.type!=="readonly" && batchesData[i] && batchesData[i][f.k] !== ""));
+}
+function cplScheduleSave(){ if(_cplRestoring) return; clearTimeout(_cplTimer); _cplTimer = setTimeout(cplSaveNow, 400); }
+function cplSaveNow(){
+  const date = document.getElementById("f-date").value;
+  if(!date){ cplStatus("Pick a Record Date to save this record automatically."); return; }
+  if(!cplHatchHasData() && !cplDbGet(date, "hatchery")) return;
+  const batches = collectBatches().map(b=>{ const o = Object.assign({}, b); delete o.i; return o; });
+  const ok = cplDbPut(date, "hatchery", { batches:batches, name:document.getElementById("f-name").value, position:document.getElementById("f-position").value });
+  if(ok) cplStatus("Saved to records database — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+  else cplStatus("NOT saved — storage problem", false);
+}
+function cplRestoreHatch(rec){
+  _cplRestoring = true;
+  try{
+    columnOrder = []; batchesData = {}; nextIndex = 0;
+    const list = rec.batches && rec.batches.length ? rec.batches : [blankBatch()];
+    list.forEach(b=>{ const i = nextIndex++; columnOrder.push(i); batchesData[i] = Object.assign(blankBatch(), b); });
+    renderTable();
+    document.getElementById("f-name").value = rec.name || "";
+    document.getElementById("f-position").value = rec.position || "";
+  } finally { _cplRestoring = false; }
+}
+function cplLoadForDate(silent){
+  const date = document.getElementById("f-date").value;
+  if(!date) return;
+  const rec = cplDbGet(date, "hatchery");
+  if(rec){
+    if(silent || !cplHatchHasData() || confirm("A saved record already exists for this date. Load it? (OK = load the saved record, Cancel = keep what is on screen and overwrite it)")){
+      cplRestoreHatch(rec);
+      cplStatus("Loaded the saved record for this date.");
+      return;
+    }
+  }
+  cplScheduleSave();
+}
+document.getElementById("f-date").addEventListener("change", ()=>cplLoadForDate(false));
+document.addEventListener("input", cplScheduleSave);
+document.addEventListener("change", cplScheduleSave);
+document.addEventListener("click", (e)=>{ if(e.target.closest && e.target.closest("button")) cplScheduleSave(); });
+// Record Date starts as today; if today already has a saved record, bring it back.
+(function(){
+  const t = new Date();
+  document.getElementById("f-date").value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+  cplLoadForDate(true);
+  if(!cplDbGet(document.getElementById("f-date").value, "hatchery")) cplStatus("Record Date is set to today — your entries save automatically.");
+})();
+
 function generatePDF(){
   const rows = collectBatches();
   const { jsPDF } = window.jspdf;
@@ -512,6 +610,9 @@ function clearForm(){
   addBatch();
   document.getElementById("f-name").value = "";
   document.getElementById("f-position").value = "";
+  document.getElementById("f-date").value = "";
+  clearTimeout(_cplTimer);
+  cplStatus("Form cleared. The saved record is still in the database — pick the date again to load it.");
 }
 
 // Warn before an accidental refresh, back button, or tab close wipes anything typed in.

@@ -156,6 +156,7 @@
 <header>
   <h1>Feed Stock Calculator</h1>
   <p>CPL Poultry Division</p>
+  <p id="rec-status" style="font-size:12px;margin-top:6px;"></p>
 </header>
 
 <div class="wrap">
@@ -250,6 +251,105 @@ function updateGrandTotal(){
 
 addFeed();
 
+// ================= OFFLINE RECORDS DATABASE (shared by the CPL apps) =================
+// Everything is saved inside this browser (localStorage), one record per date.
+const CPL_DB_KEY = "cpl_records_v1";
+let _cplDbWarned = false;
+function cplDbLoad(){
+  try{
+    const r = JSON.parse(localStorage.getItem(CPL_DB_KEY));
+    if(r && r.records) return r;
+  }catch(e){}
+  return { version:1, records:{} };
+}
+function cplDbGet(date, section){
+  const db = cplDbLoad();
+  return (db.records[date] && db.records[date][section]) || null;
+}
+function cplDbPut(date, section, payload){
+  try{
+    const db = cplDbLoad();
+    if(!db.records[date]) db.records[date] = {};
+    payload.updated = new Date().toISOString();
+    db.records[date][section] = payload;
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    return true;
+  }catch(e){
+    if(!_cplDbWarned){
+      _cplDbWarned = true;
+      alert("Could not save to the records database (storage full or blocked). Open the Monthly Records page and download a backup.");
+    }
+    return false;
+  }
+}
+function cplStatus(msg, ok){
+  const el = document.getElementById("rec-status");
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok === false ? "#ffb4ab" : "#cfe6c8";
+}
+if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+
+// ---- Autosave into the records database (one record per date) ----
+function cplFeedRows(){
+  const rows = [];
+  document.querySelectorAll("#feed-table tbody tr").forEach(tr=>{
+    const i = tr.id.replace("row-","");
+    const name = val(i,"name"), bags = val(i,"bags"), kg = val(i,"kgPerBag");
+    if(!name && !bags) return;
+    rows.push({ name:name, bags:parseFloat(bags)||0, kgPerBag:parseFloat(kg)||0, totalKg:(parseFloat(bags)||0)*(parseFloat(kg)||0) });
+  });
+  return rows;
+}
+let _cplTimer = null, _cplRestoring = false;
+function cplScheduleSave(){ if(_cplRestoring) return; clearTimeout(_cplTimer); _cplTimer = setTimeout(cplSaveNow, 400); }
+function cplSaveNow(){
+  const date = document.getElementById("f-date").value;
+  if(!date){ cplStatus("Pick a Date to start saving this record automatically."); return; }
+  const rows = cplFeedRows();
+  const ok = cplDbPut(date, "feedstock", { rows:rows, name:document.getElementById("f-name").value, grandTotal:rows.reduce((a,r)=>a+r.totalKg,0) });
+  if(ok) cplStatus("Saved to records database — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+  else cplStatus("NOT saved — storage problem", false);
+}
+function cplRestoreFeed(rec){
+  _cplRestoring = true;
+  try{
+    document.querySelector("#feed-table tbody").innerHTML = "";
+    rowCount = 0;
+    const rows = rec.rows && rec.rows.length ? rec.rows : [null];
+    rows.forEach(r=>{
+      addFeed();
+      const i = rowCount - 1;
+      if(r){
+        document.querySelector(`[data-i="${i}"][data-k="name"]`).value = r.name || "";
+        document.querySelector(`[data-i="${i}"][data-k="bags"]`).value = r.bags || "";
+        document.querySelector(`[data-i="${i}"][data-k="kgPerBag"]`).value = r.kgPerBag || 40;
+        updateRow(i);
+      }
+    });
+    document.getElementById("f-name").value = rec.name || "";
+  } finally { _cplRestoring = false; }
+}
+document.getElementById("f-date").addEventListener("change", ()=>{
+  const date = document.getElementById("f-date").value;
+  if(!date) return;
+  const rec = cplDbGet(date, "feedstock");
+  if(rec){
+    if(cplFeedRows().length === 0 || confirm("A saved record already exists for this date. Load it? (OK = load the saved record, Cancel = keep what is on screen and overwrite it)")){
+      cplRestoreFeed(rec);
+      cplStatus("Loaded the saved record for this date.");
+      return;
+    }
+  }
+  cplScheduleSave();
+});
+document.addEventListener("input", cplScheduleSave);
+document.addEventListener("change", cplScheduleSave);
+document.addEventListener("click", (e)=>{ if(e.target.closest && e.target.closest("button")) cplScheduleSave(); });
+cplStatus("Pick a Date to start saving this record automatically.");
+
 function fmtDate(d){
   if(!d) return "";
   const [y,m,day] = d.split("-");
@@ -330,6 +430,8 @@ function clearForm(){
   addFeed();
   document.getElementById("f-date").value = "";
   document.getElementById("f-name").value = "";
+  clearTimeout(_cplTimer);
+  cplStatus("Form cleared. The saved record is still in the database — pick the date again to load it.");
 }
 
 // Warn before an accidental refresh, back button, or tab close wipes anything typed in.
