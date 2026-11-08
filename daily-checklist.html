@@ -457,14 +457,11 @@
     <button class="add-row" onclick="addVaccRow()">+ Add entry</button>
 
     <div class="row" style="margin-top:14px;">
-      <div class="field"><label>Opening Stock — Male Birds</label><input type="number" min="0" id="stock-open-M" oninput="onStockOpeningEdit()"></div>
-      <div class="field"><label>Opening Stock — Female Birds</label><input type="number" min="0" id="stock-open-F" oninput="onStockOpeningEdit()"></div>
+      <div class="field"><label>Remaining Male Birds</label><input type="number" id="stock-rem-M" oninput="onRemainingEdit()"></div>
+      <div class="field"><label>Remaining Female Birds</label><input type="number" id="stock-rem-F" oninput="onRemainingEdit()"></div>
+      <div class="field"><label>Total Birds (Male + Female)</label><input type="number" id="stock-total" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
     </div>
-    <div class="row">
-      <div class="field"><label>Closing Stock — Male Birds (auto)</label><input type="number" id="stock-close-M" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
-      <div class="field"><label>Closing Stock — Female Birds (auto)</label><input type="number" id="stock-close-F" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
-    </div>
-    <p class="hint">Closing Stock = Opening Stock − the Male / Female mortalities entered above. Type your starting figures once. When you tap Generate PDF, today's Closing Stock is saved and becomes tomorrow's Opening Stock. You can still change the Opening Stock any time to correct it.</p>
+    <p class="hint">Type today's Remaining Male and Female birds once. After that, every time you enter a Mortality number and choose Male or Female above, that number is taken off the matching Remaining figure automatically, and the Total updates. The figures are saved on this device, so they are still there after a refresh and on your next form. You can retype a Remaining figure any time to correct it.</p>
   </div>
 
   <div class="card">
@@ -977,11 +974,12 @@ function checkMortalityAlert(i){
   }
 }
 
-// ---- Male / Female bird stock (carried forward from form to form) ----
-// The stock figure lives in this browser's own storage, so it is still there after the
-// PDF is made and when the page is reloaded. It only works once the file is hosted
-// (e.g. on GitHub Pages), not inside a chat preview.
+// ---- Remaining Male / Female birds (reduced by mortalities, saved for the next form) ----
+// The figures live in this browser's own storage, so they are still there after a refresh
+// and on the next form. This only works once the file is hosted (e.g. on GitHub Pages),
+// not inside a chat preview.
 const BIRD_STOCK_KEY = "cpl_bird_stock_v1";
+let stockBase = { M:null, F:null };   // remaining birds BEFORE the mortalities typed on this form
 
 function loadBirdStock(){
   try{
@@ -991,6 +989,11 @@ function loadBirdStock(){
 }
 function saveBirdStock(male, female){
   try{ localStorage.setItem(BIRD_STOCK_KEY, JSON.stringify({ male, female })); }catch(e){}
+}
+function toNumOrNull(v){
+  if(v === "" || v === null || v === undefined) return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
 }
 function vaccMortalityTotals(){
   let male = 0, female = 0;
@@ -1002,35 +1005,33 @@ function vaccMortalityTotals(){
   }
   return { male, female };
 }
-function updateBirdStock(){
+// Remaining = starting figure - mortalities on this form. Saved every time it changes.
+function updateBirdStock(skipId){
   const t = vaccMortalityTotals();
-  const oM = document.getElementById("stock-open-M").value;
-  const oF = document.getElementById("stock-open-F").value;
-  document.getElementById("stock-close-M").value = oM === "" ? "" : (parseFloat(oM) - t.male);
-  document.getElementById("stock-close-F").value = oF === "" ? "" : (parseFloat(oF) - t.female);
+  const rM = stockBase.M === null ? "" : stockBase.M - t.male;
+  const rF = stockBase.F === null ? "" : stockBase.F - t.female;
+  if(skipId !== "stock-rem-M") document.getElementById("stock-rem-M").value = rM;
+  if(skipId !== "stock-rem-F") document.getElementById("stock-rem-F").value = rF;
+  document.getElementById("stock-total").value = (rM === "" && rF === "") ? "" : ((rM === "" ? 0 : rM) + (rF === "" ? 0 : rF));
+  if(rM !== "" || rF !== "") saveBirdStock(rM, rF);
 }
-// Typing or correcting the Opening Stock saves it straight away as the new starting figure.
-function onStockOpeningEdit(){
-  saveBirdStock(document.getElementById("stock-open-M").value, document.getElementById("stock-open-F").value);
-  updateBirdStock();
+// Typing or correcting a Remaining figure: keep it exactly as typed, and reduce from it from now on.
+function onRemainingEdit(){
+  const t = vaccMortalityTotals();
+  const m = toNumOrNull(document.getElementById("stock-rem-M").value);
+  const f = toNumOrNull(document.getElementById("stock-rem-F").value);
+  stockBase.M = m === null ? null : m + t.male;
+  stockBase.F = f === null ? null : f + t.female;
+  const rM = m === null ? "" : m, rF = f === null ? "" : f;
+  document.getElementById("stock-total").value = (rM === "" && rF === "") ? "" : ((rM === "" ? 0 : rM) + (rF === "" ? 0 : rF));
+  saveBirdStock(rM, rF);
 }
+// Page load / Clear: bring back the last saved Remaining figures.
 function restoreBirdStock(){
   const s = loadBirdStock();
-  if(s){
-    document.getElementById("stock-open-M").value = s.male;
-    document.getElementById("stock-open-F").value = s.female;
-  }
+  stockBase.M = s ? toNumOrNull(s.male) : null;
+  stockBase.F = s ? toNumOrNull(s.female) : null;
   updateBirdStock();
-}
-// Called when the PDF is made: today's closing stock becomes the next form's opening stock.
-function commitBirdStock(){
-  updateBirdStock();
-  const cM = document.getElementById("stock-close-M").value;
-  const cF = document.getElementById("stock-close-F").value;
-  if(cM !== "" || cF !== ""){
-    const s = loadBirdStock() || {};
-    saveBirdStock(cM !== "" ? cM : (s.male ?? ""), cF !== "" ? cF : (s.female ?? ""));
-  }
 }
 
 function autoTotalEggs(){
@@ -1152,10 +1153,9 @@ function collectData(){
   data.eggCurrentStorage = document.getElementById("egg-current-storage").value;
   data.eggTotalStorage = document.getElementById("egg-total-storage").value;
   data.eggTotal = document.getElementById("egg-total").value;
-  data.stockOpenM = document.getElementById("stock-open-M").value;
-  data.stockOpenF = document.getElementById("stock-open-F").value;
-  data.stockCloseM = document.getElementById("stock-close-M").value;
-  data.stockCloseF = document.getElementById("stock-close-F").value;
+  data.stockRemM = document.getElementById("stock-rem-M").value;
+  data.stockRemF = document.getElementById("stock-rem-F").value;
+  data.stockTotal = document.getElementById("stock-total").value;
 
   return data;
 }
@@ -1285,19 +1285,18 @@ function generatePDF(){
     margin:{left:marginL,right:marginL},
     styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
-    head:[["Bird Stock","Male","Female"]],
+    head:[["Bird Stock","Male","Female","Total"]],
     body:[
-      ["Opening Stock", d.stockOpenM, d.stockOpenF],
-      ["Closing Stock", d.stockCloseM, d.stockCloseF],
+      ["Remaining Birds", d.stockRemM, d.stockRemF, d.stockTotal],
     ],
     columnStyles:{0:{halign:"left",fontStyle:"bold"}},
     didParseCell: function(data){
-      if(data.section === "body" && data.row.index === 1 && data.column.index > 0){
+      if(data.section === "body" && data.column.index > 0){
         data.cell.styles.textColor = [179,38,30];
         data.cell.styles.fontStyle = "bold";
       }
     },
-    tableWidth: 220,
+    tableWidth: 290,
   });
   y = doc.lastAutoTable.finalY + 12;
 
@@ -1354,7 +1353,6 @@ function generatePDF(){
   const fileDate = d.date ? d.date.split("-").reverse().join(" ") : "Draft";
   const fname = `${fileDate} Daily Poultry Operations.pdf`;
   doc.save(fname);
-  commitBirdStock();
 }
 
 function clearForm(){
