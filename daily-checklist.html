@@ -462,6 +462,23 @@
     <button class="add-row" onclick="addFeedRow()">+ Add house</button>
   </div>
 
+  <div class="card" id="ration-card">
+    <h2>Feed Ration (auto from remaining birds)</h2>
+    <div class="row">
+      <div class="field"><label>Week of age (auto from the Date)</label><input type="number" id="ration-week" min="1" max="90" oninput="onRationWeek()"></div>
+      <div class="field"><label>Male feed (g per bird per day)</label><input type="number" id="ration-gM" step="0.1" oninput="onRationGrams()"></div>
+      <div class="field"><label>Female feed (g per bird per day)</label><input type="number" id="ration-gF" step="0.1" oninput="onRationGrams()"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Male feed (kg) = Remaining Male × g</label><input type="text" id="ration-kgM" readonly style="background:#f0efe8;font-weight:700;"></div>
+      <div class="field"><label>Female feed (kg) = Remaining Female × g</label><input type="text" id="ration-kgF" readonly style="background:#f0efe8;font-weight:700;"></div>
+      <div class="field"><label>Total feed (kg)</label><input type="text" id="ration-kgT" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
+      <div class="field"><label>Bags (40 kg each)</label><input type="text" id="ration-bags" readonly style="background:#f0efe8;"></div>
+    </div>
+    <p class="hint" id="ration-note"></p>
+    <p class="hint">The kg figures fill the Male and Female Feed boxes of the first house above, and update by themselves when the Remaining birds change. You can still type over them.</p>
+  </div>
+
   <div class="card">
     <h2>Vaccination & Mortality</h2>
     <div class="scroll-x">
@@ -1015,6 +1032,7 @@ function updateBirdStock(skipId){
   if(skipId !== "stock-rem-F") document.getElementById("stock-rem-F").value = rF;
   document.getElementById("stock-total").value = (rM === "" && rF === "") ? "" : ((rM === "" ? 0 : rM) + (rF === "" ? 0 : rF));
   if(rM !== "" || rF !== "") saveBirdStock(rM, rF);
+  if(typeof updateRation === "function") updateRation(false, false);
 }
 // Typing or correcting a Remaining figure: keep it exactly as typed, and reduce from it from now on.
 function onRemainingEdit(){
@@ -1026,6 +1044,7 @@ function onRemainingEdit(){
   const rM = m === null ? "" : m, rF = f === null ? "" : f;
   document.getElementById("stock-total").value = (rM === "" && rF === "") ? "" : ((rM === "" ? 0 : rM) + (rF === "" ? 0 : rF));
   saveBirdStock(rM, rF);
+  if(typeof updateRation === "function") updateRation(false, false);
 }
 // Page load / Clear: bring back the last saved Remaining figures.
 function restoreBirdStock(){
@@ -1067,12 +1086,92 @@ document.getElementById("egg-hatchery").addEventListener("input", updateTableEgg
 document.getElementById("egg-current-storage").addEventListener("input", updateTotalStorage);
 document.getElementById("egg-smash").addEventListener("input", updateTableEggs);
 
+// ---- Feed ration: kg = remaining birds x grams per bird per day (Male and Female separately) ----
+const RATION_KEY = "cpl_ration_v1";
+let _rationAuto = { M:"", F:"" };
+function rationLoad(){
+  try{ const r = JSON.parse(localStorage.getItem(RATION_KEY)); if(r && r.weeks && r.ref) return r; }catch(e){}
+  return null;
+}
+function rationSave(r){ try{ localStorage.setItem(RATION_KEY, JSON.stringify(r)); }catch(e){} }
+function rationInit(){
+  // first time on this device: Week 50 and the current feeding rates (30 kg / 229 males, 406 kg / 2554 females)
+  if(!rationLoad()) rationSave({ ref:{ date:"2026-11-09", week:50 }, weeks:{ "50":{ M:131, F:158.96 } } });
+  if(!loadBirdStock()) saveBirdStock(229, 2554);
+}
+function rationDateISO(){
+  const d = document.getElementById("f-date").value;
+  if(d) return d;
+  const t = new Date();
+  return t.getFullYear() + "-" + String(t.getMonth()+1).padStart(2,"0") + "-" + String(t.getDate()).padStart(2,"0");
+}
+function rationUTC(iso){ const p = iso.split("-").map(Number); return Date.UTC(p[0], p[1]-1, p[2]); }
+function rationWeekFor(iso){
+  const r = rationLoad();
+  return r.ref.week + Math.floor((rationUTC(iso) - rationUTC(r.ref.date)) / (7*86400000));
+}
+function rationFor(week){
+  const r = rationLoad(), ws = Object.keys(r.weeks).map(Number).sort((a,b)=>a-b);
+  let pick = null;
+  ws.forEach(w=>{ if(w <= week) pick = w; });
+  if(pick === null) pick = ws[0];
+  return { M:r.weeks[pick].M, F:r.weeks[pick].F, from:pick, exact:(pick === week) };
+}
+function onRationWeek(){
+  const w = parseInt(document.getElementById("ration-week").value, 10);
+  if(isNaN(w) || w < 1) return;
+  const r = rationLoad(); r.ref = { date:rationDateISO(), week:w }; rationSave(r);
+  updateRation(true, false);
+}
+function onRationGrams(){
+  const w = parseInt(document.getElementById("ration-week").value, 10);
+  const m = toNumOrNull(document.getElementById("ration-gM").value), f = toNumOrNull(document.getElementById("ration-gF").value);
+  if(isNaN(w)) return;
+  const r = rationLoad(); r.weeks[String(w)] = { M:m === null ? 0 : m, F:f === null ? 0 : f }; rationSave(r);
+  updateRation(true, true);
+}
+function updateRation(skipWeek, skipGrams){
+  if(!document.getElementById("ration-week") || !rationLoad()) return;
+  const week = skipWeek ? parseInt(document.getElementById("ration-week").value, 10) : rationWeekFor(rationDateISO());
+  if(!skipWeek) document.getElementById("ration-week").value = week;
+  if(isNaN(week)) return;
+  const g = rationFor(week);
+  if(!skipGrams){ document.getElementById("ration-gM").value = g.M; document.getElementById("ration-gF").value = g.F; }
+  document.getElementById("ration-note").textContent = g.exact
+    ? "Using the saved ration for week " + week + ". Change the grams any time and it is remembered for this week."
+    : "No ration saved for week " + week + " yet, so week " + g.from + "'s is used. Type this week's Cobb 500 figures above to save them.";
+  const gM = toNumOrNull(document.getElementById("ration-gM").value) , gF = toNumOrNull(document.getElementById("ration-gF").value);
+  const remM = toNumOrNull(document.getElementById("stock-rem-M").value), remF = toNumOrNull(document.getElementById("stock-rem-F").value);
+  const kgM = (remM === null || gM === null) ? null : Math.round(remM * gM / 100) / 10;
+  const kgF = (remF === null || gF === null) ? null : Math.round(remF * gF / 100) / 10;
+  document.getElementById("ration-kgM").value = kgM === null ? "" : kgM;
+  document.getElementById("ration-kgF").value = kgF === null ? "" : kgF;
+  const tot = (kgM === null && kgF === null) ? null : Math.round(((kgM||0) + (kgF||0)) * 10) / 10;
+  document.getElementById("ration-kgT").value = tot === null ? "" : tot;
+  document.getElementById("ration-bags").value = tot === null ? "" : Math.round(tot / 40 * 10) / 10;
+  rationAutoFill(kgM, kgF);
+}
+function rationAutoFill(kgM, kgF){
+  if(feedRowCount < 1) return;
+  [["M","male",kgM],["F","female",kgF]].forEach(a=>{
+    const el = document.querySelector(`[data-feed-${a[1]}="0"]`);
+    if(!el || a[2] === null) return;
+    const nv = String(a[2]);
+    if(el.value === "" || el.value === _rationAuto[a[0]]){
+      if(el.value !== nv){ el.value = nv; el.dispatchEvent(new Event("input", { bubbles:true })); }
+      _rationAuto[a[0]] = nv;
+    }
+  });
+}
+document.getElementById("f-date").addEventListener("change", ()=>updateRation(false, false));
+
 buildSetterTable();
 buildFanTable();
 addHouseRow();
 addFeedRow();
 addVaccRow();
 refreshSignatureImages();
+rationInit();
 restoreBirdStock();
 
 // ================= SCAN PAPER (free on-device reading with Tesseract.js) =================
@@ -1221,7 +1320,7 @@ function cplFieldKey(el, seen){
   return k + "~" + seen[k];
 }
 function cplSkipField(el){
-  return el.type === "file" || el.id === "f-date" || el.id === "stock-rem-M" || el.id === "stock-rem-F" || el.id === "stock-total";
+  return el.type === "file" || (el.id && el.id.indexOf("ration-") === 0) || el.id === "f-date" || el.id === "stock-rem-M" || el.id === "stock-rem-F" || el.id === "stock-total";
 }
 function cplSnapshotFields(){
   const seen = {}, out = {};
