@@ -1,5 +1,5 @@
 // CPL Poultry apps — lets the apps open with no internet after the first online visit.
-const CACHE = "cpl-apps-v1";
+const CACHE = "cpl-apps-v2";
 const LOCAL = [
   "./", "index.html", "daily-checklist.html", "feed-stock-calculator.html", "monthly-records.html", "hatchery-report.html"
 ];
@@ -27,7 +27,9 @@ self.addEventListener("fetch", (e)=>{
   if(e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   const isCdn = url.hostname === "cdnjs.cloudflare.com";
-  if(url.origin !== location.origin && !isCdn) return;
+  // OCR engine files (scan paper): fetched with CORS, so cache them as they are
+  const isCors = url.hostname === "cdn.jsdelivr.net" || url.hostname === "tessdata.projectnaptha.com";
+  if(url.origin !== location.origin && !isCdn && !isCors) return;
   e.respondWith((async()=>{
     const c = await caches.open(CACHE);
     try{
