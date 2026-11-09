@@ -282,6 +282,7 @@ function summarize(days){
   S.hatchPct = S.eggs ? (S.hatch||0)/S.eggs*100 : null;
   S.mortM=tot("mortM"); S.mortF=tot("mortF"); S.mortT=tot("mortT");
   S.feed=tot("feedT"); S.feedM=tot("feedM"); S.feedF=tot("feedF"); S.water=tot("water"); S.stockKg=tot("stockKg");
+  S.storeSum=tot("eggTotalStore"); S.curSum=tot("eggStore");
   S.hSet=tot("h_eggSet"); S.hFertile=tot("h_fertile"); S.hHatch=tot("h_hatchChicks"); S.hSalable=tot("h_salable");
   S.hPct = S.hFertile ? (S.hHatch||0)/S.hFertile*100 : null;
   S.hBatches = tot("hCount");
@@ -350,6 +351,16 @@ function combinedImage(S){
 // ============================ SCREEN ============================
 function currentMonth(){ return document.getElementById("month").value; }
 function kpi(val,label){ return `<div class="kpi"><b>${val}</b><span>${label}</span></div>`; }
+function kpiPairs(S){
+  return [
+    [S.count,"Days recorded"], [fmt(S.eggs),"Total eggs"], [fmt(S.avgEggs),"Average eggs per day"],
+    [fmt(S.hatch)+(S.hatchPct!==null?" ("+fmt(S.hatchPct)+"%)":""),"Hatchery eggs"], [fmt(S.table),"Table eggs"], [fmt(S.smash),"Smash eggs"],
+    [fmt(S.mortT),"Total mortality"], [fmt(S.mortM)+" M / "+fmt(S.mortF)+" F","Male / Female mortality"],
+    [fmt(S.remT),"Birds remaining (latest)"], [fmt(S.feed),"Feed given (kg)"], [fmt(S.water),"Water (litres)"], [fmt(S.stockKg),"Feed stock recorded (kg)"],
+    [fmt(S.storeSum),"Storage eggs — all days added up"], [fmt(S.curSum),"Current storage — all days added up"],
+    [fmt(S.hBatches),"Hatchery batches"], [fmt(S.hSet),"Eggs set"], [fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"], [fmt(S.hSalable),"Salable chicks"]
+  ];
+}
 function refresh(){
   const ym = currentMonth();
   document.getElementById("sample-note").style.display = SAMPLE?"block":"none";
@@ -358,24 +369,23 @@ function refresh(){
   const days = monthDays(ym), S = summarize(days);
   document.getElementById("btn-pdf").disabled = days.length===0;
   document.getElementById("pdf-hint").textContent = days.length ? ("The PDF will contain "+days.length+" recorded day(s) for "+monthTitle(ym)+(SAMPLE?" (SAMPLE DATA).":".")) : "No records saved for this month yet. Fill in the Daily Operation Checklist (with a Date) and it will appear here automatically.";
-  document.getElementById("kpis").innerHTML = days.length ? [
-    kpi(S.count,"Days recorded"), kpi(fmt(S.eggs),"Total eggs"), kpi(fmt(S.avgEggs),"Average eggs per day"),
-    kpi(fmt(S.hatch)+(S.hatchPct!==null?" ("+fmt(S.hatchPct)+"%)":""),"Hatchery eggs"), kpi(fmt(S.table),"Table eggs"), kpi(fmt(S.smash),"Smash eggs"),
-    kpi(fmt(S.mortT),"Total mortality"), kpi(fmt(S.mortM)+" M / "+fmt(S.mortF)+" F","Male / Female mortality"),
-    kpi(fmt(S.remT),"Birds remaining (latest)"), kpi(fmt(S.feed),"Feed given (kg)"), kpi(fmt(S.water),"Water (litres)"), kpi(fmt(S.stockKg),"Feed stock recorded (kg)"),
-    kpi(fmt(S.hBatches),"Hatchery batches"), kpi(fmt(S.hSet),"Eggs set"), kpi(fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"), kpi(fmt(S.hSalable),"Salable chicks")
-  ].join("") : '<div class="nodata" style="grid-column:1/-1;">Nothing to summarise yet.</div>';
+  document.getElementById("kpis").innerHTML = days.length ? kpiPairs(S).map(k=>kpi(k[0],k[1])).join("") : '<div class="nodata" style="grid-column:1/-1;">Nothing to summarise yet.</div>';
   renderCharts(S);
   const t = document.getElementById("days-table");
-  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Mortality</th><th></th></tr></thead>";
+  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Storage eggs</th><th>Mortality</th><th></th></tr></thead>";
   const tb = document.createElement("tbody");
   days.forEach(d=>{
     const tr = document.createElement("tr");
-    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.mortT===undefined?null:d.mortT)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.eggTotalStore===undefined?null:d.eggTotalStore), fmt(d.mortT===undefined?null:d.mortT)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
     const td = document.createElement("td");
     if(!SAMPLE){ const b=document.createElement("button"); b.className="danger"; b.textContent="Delete"; b.style.padding="4px 8px"; b.onclick=()=>deleteDay(d.date); td.appendChild(b); }
     tr.appendChild(td); tb.appendChild(tr);
   });
+  if(days.length){
+    const tr = document.createElement("tr"); tr.style.fontWeight = "800";
+    ["MONTH TOTAL","","","",fmt(S.eggs),fmt(S.storeSum),fmt(S.mortT),""].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    tb.appendChild(tr);
+  }
   t.appendChild(tb);
   backupInfo();
 }
@@ -495,7 +505,7 @@ function generateMonthlyPDF(){
     doc.addPage = function(f,o){ return origAddPage(f||"a4", o||orient); };
     const opts = Object.assign({}, tableDefaults, { startY:y+12, head:[head], body, columnStyles:colStyles||{}, styles:Object.assign({},tableDefaults.styles,{halign:"center"}),
       didDrawPage:(data)=>{ if(data.pageNumber !== startPage) banner(heading+" (continued)"); } });
-    if(foot) opts.foot=[foot];
+    if(foot) opts.foot = Array.isArray(foot[0]) ? foot : [foot];
     try{ doc.autoTable(opts); } finally { doc.addPage = origAddPage; }
   }
   // ---- Page 1: cover & summary (first page) ----
@@ -506,22 +516,28 @@ function generateMonthlyPDF(){
   doc.text(days.length+" day(s) of records  •  First: "+niceDate(days[0].date)+"  •  Last: "+niceDate(days[days.length-1].date), M, y+28);
   if(SAMPLE){ doc.setTextColor(...[179,38,30]); doc.setFont("helvetica","bold"); doc.text("SAMPLE DATA — made up figures, for layout preview only.", M, y+44); doc.setFont("helvetica","normal"); }
   doc.setTextColor(0,0,0);
-  const kp = [
-    ["Days recorded", String(S.count)],
-    ["Total eggs collected", fmt(S.eggs)], ["Average eggs per recorded day", fmt(S.avgEggs)],
-    ["Hatchery eggs", fmt(S.hatch)+(S.hatchPct!==null?"  ("+fmt(S.hatchPct)+"% of total)":"")], ["Table eggs", fmt(S.table)], ["Smash eggs", fmt(S.smash)],
-    ["Total mortality", fmt(S.mortT)], ["Mortality — Male", fmt(S.mortM)], ["Mortality — Female", fmt(S.mortF)],
-    ["Remaining birds (latest) — Male / Female / Total", fmt(S.remM)+" / "+fmt(S.remF)+" / "+fmt(S.remT)],
-    ["Feed given (kg) — Male / Female / Total", fmt(S.feedM)+" / "+fmt(S.feedF)+" / "+fmt(S.feed)],
-    ["Water consumption (litres)", fmt(S.water)], ["Feed stock recorded (kg)", fmt(S.stockKg)],
-    ["Average house temperature — Morning / Afternoon (°C)", fmt(S.tempAM)+" / "+fmt(S.tempPM)], ["Days with a faulty fan", String(S.fanDays)],
-    ["Hatchery batches recorded", fmt(S.hBatches)], ["Eggs set / Candling fertile", fmt(S.hSet)+" / "+fmt(S.hFertile)], ["Chicks hatched / Salable chicks", fmt(S.hHatch)+" / "+fmt(S.hSalable)], ["Hatch % of fertile eggs", S.hPct===null?"—":fmt(S.hPct)+"%"]
-  ];
-  doc.autoTable(Object.assign({}, tableDefaults, { startY:y+58, head:[["Measure","Month figure"]], body:kp, columnStyles:{0:{cellWidth:300},1:{halign:"right",fontStyle:"bold"}}, styles:{fontSize:10,cellPadding:5}, margin:{left:M,right:M,top:56,bottom:34} }));
-  let yy = doc.lastAutoTable.finalY + 14;
-  doc.setFontSize(9); doc.setTextColor(90,90,90);
-  doc.text("Contents: daily tables (eggs, birds & mortality, feed & water, environment), the month totals graph, vaccination & mortality log, equipment remarks, feed stock records.", M, yy, {maxWidth:pw()-2*M});
+  // summary boxes, same figures and order as the Month summary on the page
+  const pairs = kpiPairs(S), cols = 3, gap = 10, cw = (pw()-2*M-gap*(cols-1))/cols, chh = 56;
+  let cy = y + 62;
+  doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...GREEN); doc.text("Month summary", M, cy-8); doc.setTextColor(0,0,0);
+  pairs.forEach((k,i)=>{
+    const x = M + (i%cols)*(cw+gap), yy0 = cy + Math.floor(i/cols)*(chh+gap);
+    doc.setDrawColor(216,211,196); doc.setFillColor(251,250,246); doc.setLineWidth(0.8); doc.rect(x, yy0, cw, chh, "FD");
+    doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.setTextColor(...GREEN); doc.text(String(k[0]), x+8, yy0+23, {maxWidth:cw-16});
+    doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(106,106,94); doc.text(String(k[1]), x+8, yy0+42, {maxWidth:cw-16});
+  });
   doc.setTextColor(0,0,0);
+
+  // ---- Graph page (right after the summary, like the page) ----
+  if(hasTotals){
+    const gy = newPage("portrait","Graph");
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...GREEN); doc.text("Month totals — every heading in one graph", M, gy+2); doc.setTextColor(0,0,0);
+    const im = combinedImage(S), w = pw()-2*M, h = w*im.h/im.w;
+    doc.addImage(im.url,"PNG",M,gy+10,w,h);
+    doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(90,90,90);
+    doc.text("Each bar is the total for the month. Temperature, humidity, remaining birds and fan faults are not totals, so they appear in the tables only.", M, gy+h+24, {maxWidth:pw()-2*M});
+    doc.setTextColor(0,0,0);
+  }
 
   // ---- Landscape daily tables ----
   const hasEgg = days.some(d=>d.eggTotal!==undefined && d.eggTotal!==null);
@@ -529,10 +545,14 @@ function generateMonthlyPDF(){
   const E = (v)=>fmt(v===undefined?null:v);
   const T = (k)=>fmt(sum(days.map(d=>d[k]===undefined?null:d[k])));
   const lastOf = (k)=>{ let v=null; days.forEach(d=>{ if(d[k]!==undefined && d[k]!==null) v=d[k]; }); return fmt(v); };
+  sectionTable("Days Recorded", ["Date","Checklist","Feed stock","Hatchery","Eggs","Storage Eggs","Mortality"],
+    days.map(d=>[niceDate(d.date), d.hasChecklist?"Yes":"—", d.hasFeedStock?"Yes":"—", d.hasHatchery?"Yes":"—", E(d.eggTotal), E(d.eggTotalStore), E(d.mortT)]),
+    ["MONTH TOTAL","","","",fmt(S.eggs),fmt(S.storeSum),fmt(S.mortT)], "portrait");
   if(days.some(d=>d.hasChecklist)){
     sectionTable("Daily Egg Production", ["Date","9:00am","12:00pm","4:00pm","Total Eggs","Hatchery","Table","Smash","Hatchery %","Current Storage","Total Storage"],
       dayRows(d=>[niceDate(d.date),E(d.egg9),E(d.egg12),E(d.egg4),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),d.hatchPct===null||d.hatchPct===undefined?"—":fmt(d.hatchPct)+"%",E(d.eggStore),E(d.eggTotalStore)]),
-      ["TOTAL",T("egg9"),T("egg12"),T("egg4"),T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),S.hatchPct===null?"—":fmt(S.hatchPct)+"%","Last: "+lastOf("eggStore"),"Last: "+lastOf("eggTotalStore")], "landscape");
+      [["MONTH TOTAL",T("egg9"),T("egg12"),T("egg4"),T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),S.hatchPct===null?"—":fmt(S.hatchPct)+"%",T("eggStore"),T("eggTotalStore")],
+       ["LATEST DAY","","","","","","","","",lastOf("eggStore"),lastOf("eggTotalStore")]], "landscape");
     let cumT = 0;
     sectionTable("Birds & Mortality", ["Date","Mortality Male","Mortality Female","Not specified","Total Mortality","Cumulative","Remaining Male","Remaining Female","Remaining Total"],
       dayRows(d=>{ if(d.mortT!==null && d.mortT!==undefined) cumT+=d.mortT; return [niceDate(d.date),E(d.mortM),E(d.mortF),E(d.mortU),E(d.mortT),fmt(cumT),E(d.remM),E(d.remF),E(d.remT)]; }),
@@ -557,17 +577,6 @@ function generateMonthlyPDF(){
     const bRows = [];
     hDays.forEach(d=>d.hBatches.forEach(b=>bRows.push([niceDate(d.date),b.batch||"—",b.setDate?niceDate(b.setDate):"—",b.transferDate?niceDate(b.transferDate):"—",b.hatchDate?niceDate(b.hatchDate):"—",fmt(n(b.eggSet)),fmt(n(b.fertile)),fmt(n(b.hatchChicks)),fmt(n(b.salable)),fmt(n(b.unhatched)),b.fertilePct||"—"])));
     sectionTable("Hatchery Record — batch details", ["Record Date","Batch","Set Date","Transfer Date","Hatch Date","Egg Set","Candling Fertile","Hatch Chicks","Salable","Unhatched","Fertile %"], bRows, null, "landscape");
-  }
-
-  // ---- One combined bar graph (month totals) ----
-  if(hasTotals){
-    const gy = newPage("portrait","Graph");
-    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...GREEN); doc.text("Month totals — every heading in one graph", M, gy+2); doc.setTextColor(0,0,0);
-    const im = combinedImage(S), w = pw()-2*M, h = w*im.h/im.w;
-    doc.addImage(im.url,"PNG",M,gy+10,w,h);
-    doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(90,90,90);
-    doc.text("Each bar is the total for the month. Temperature, humidity, remaining birds and fan faults are not totals, so they appear in the tables only.", M, gy+h+24, {maxWidth:pw()-2*M});
-    doc.setTextColor(0,0,0);
   }
 
   // ---- Logs ----
