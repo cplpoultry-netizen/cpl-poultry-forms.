@@ -387,6 +387,10 @@
         <input type="date" id="f-date">
       </div>
       <div class="field">
+        <label style="color:#b3261e;font-weight:800;">Age (Weeks):</label>
+        <input type="number" id="ration-week" min="1" max="90" oninput="onRationWeek()" style="color:#b3261e;font-weight:800;">
+      </div>
+      <div class="field">
         <label>Shift</label>
         <select id="f-shift">
           <option>Day</option>
@@ -472,7 +476,6 @@
   <div class="card" id="ration-card">
     <h2>Feed Ration (auto from remaining birds)</h2>
     <div class="row">
-      <div class="field"><label>Week of age (auto from the Date)</label><input type="number" id="ration-week" min="1" max="90" oninput="onRationWeek()"></div>
       <div class="field"><label>Male feed (g per bird per day)</label><input type="number" id="ration-gM" step="0.1" oninput="onRationGrams()"></div>
       <div class="field"><label>Female feed (g per bird per day)</label><input type="number" id="ration-gF" step="0.1" oninput="onRationGrams()"></div>
     </div>
@@ -1611,6 +1614,7 @@ function collectData(){
   }
 
   data.date = document.getElementById("f-date").value;
+  data.age = document.getElementById("ration-week").value;
   data.shift = document.getElementById("f-shift").value;
   data.leader = document.getElementById("f-leader").value;
   data.egg9 = document.getElementById("egg-9am").value;
@@ -1656,8 +1660,11 @@ function generatePDF(){
   doc.setFont("helvetica","normal");
   doc.setFontSize(9.5);
   doc.text(`Date: ${fmtDate(d.date)}`, marginL, 60);
-  doc.text(`Shift: ${d.shift}`, marginL+150, 60);
-  doc.text(`Team Leader: ${d.leader}`, marginL+280, 60);
+  doc.setFont("helvetica","bold"); doc.setTextColor(179,38,30);
+  doc.text(`Age (Weeks): ${d.age || ""}`, marginL+110, 60);
+  doc.setFont("helvetica","normal"); doc.setTextColor(0,0,0);
+  doc.text(`Shift: ${d.shift}`, marginL+235, 60);
+  doc.text(`Team Leader: ${d.leader}`, marginL+330, 60);
 
   let y = 70;
 
