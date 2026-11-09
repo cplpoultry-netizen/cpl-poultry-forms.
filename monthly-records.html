@@ -79,6 +79,33 @@
     <div style="overflow-x:auto;"><table class="days" id="days-table"></table></div>
   </div>
 
+  <div class="card" id="share-card">
+    <h2>Share between devices (cloud sync)</h2>
+    <p class="hint" style="margin-top:0;">Connect once on each phone or computer. After that, every record you save is also sent to a Google Sheet in your own Drive, and every device shows the same records. It still works with no internet and catches up later.</p>
+    <p class="hint"><b>Status:</b> <span id="sync-status">Not connected on this device.</span></p>
+    <div id="share-connected" style="display:none;">
+      <div class="btns"><button class="primary" onclick="syncNowClick()">Sync now</button><button class="danger" onclick="disconnectSync()">Disconnect this device</button></div>
+    </div>
+    <details id="share-setup" style="margin-top:10px;">
+      <summary style="cursor:pointer;font-weight:600;color:var(--green-dark);">Set-up steps (first time)</summary>
+      <ol style="font-size:13px;line-height:1.6;padding-left:20px;">
+        <li>Think of a <b>secret passphrase</b> (any word, no spaces, e.g. <i>cplpoultry2026kk</i>) and type it below. Use the same one on every device.</li>
+        <li>Press <b>Copy the script</b>.</li>
+        <li>Open <b>script.google.com</b> in your browser (on a phone, tick <b>Desktop site</b> in the browser menu first), sign in with your Gmail and tap <b>New project</b>. Delete everything in the editor, paste the script, and press the save icon.</li>
+        <li>Press <b>Deploy → New deployment</b>. Click the gear and choose <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>. Press <b>Deploy</b>, then <b>Authorize access</b> (choose your account → <b>Advanced</b> → <b>Go to project</b> → <b>Allow</b>). Your records sheet is created by itself in Google Drive, named <i>CPL Poultry Records (cloud sync)</i>.</li>
+        <li>Copy the <b>Web app URL</b> it shows (ends in <i>/exec</i>) and paste it below, then press <b>Connect &amp; sync</b>.</li>
+        <li>On your other devices: open this page, type the same passphrase and paste the same URL, then Connect &amp; sync.</li>
+      </ol>
+      <label for="sync-pass">Secret passphrase</label>
+      <input type="text" id="sync-pass" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--line);border-radius:6px;" autocomplete="off">
+      <div class="btns"><button onclick="copyScript()">Copy the script</button></div>
+      <label for="sync-url" style="margin-top:10px;">Web app URL</label>
+      <input type="text" id="sync-url" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--line);border-radius:6px;" autocomplete="off">
+      <div class="btns"><button class="primary" onclick="connectSync()">Connect &amp; sync</button></div>
+      <p class="hint">Anyone who has both the URL and the passphrase could read your records, so keep them private. Your records are also kept in a Google Sheet in your Drive (CPL Poultry Records (cloud sync)) — open it to see every record.</p>
+    </details>
+  </div>
+
   <div class="card">
     <h2>Backup (important)</h2>
     <p class="hint" style="margin-top:0;">Your records live only inside this browser on this device. If you clear the browser data or change phones, they are gone. Download a backup file once a month and keep it safe (e.g. email it to yourself).</p>
@@ -100,6 +127,77 @@ function cplDbLoad(){
   return { version:1, records:{} };
 }
 function cplDbSaveAll(db){ try{ localStorage.setItem(CPL_DB_KEY, JSON.stringify(db)); return true; }catch(e){ alert("Could not save (storage full or blocked)."); return false; } }
+
+
+// ---------- Cloud sync between devices (Google Sheet + Apps Script) ----------
+// Only active after you connect it on the Monthly Records page. Records still save on this device first.
+const CPL_SYNC_KEY = "cpl_sync_cfg";
+function cplSyncCfg(){
+  try{ const c = JSON.parse(localStorage.getItem(CPL_SYNC_KEY)); if(c && c.url && c.key) return c; }catch(e){}
+  return null;
+}
+function cplSyncSetStatus(m){
+  try{ localStorage.setItem("cpl_sync_status", m); }catch(e){}
+  const el = document.getElementById("sync-status"); if(el) el.textContent = m;
+}
+async function cplSyncPost(items){
+  const c = cplSyncCfg();
+  const r = await fetch(c.url, { method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({ key:c.key, items:items }) });
+  const j = await r.json();
+  if(j.error) throw new Error(j.error);
+  return j;
+}
+let _syncQueue = [], _syncTimer = null;
+function cplSyncPush(items){
+  if(!cplSyncCfg()) return;
+  _syncQueue = _syncQueue.concat(items);
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(cplSyncFlush, 2500);
+}
+async function cplSyncFlush(){
+  const map = {}; _syncQueue.forEach(it=>{ map[it.date+"|"+it.section] = it; }); _syncQueue = [];
+  const items = Object.values(map);
+  if(!items.length || !cplSyncCfg()) return;
+  try{
+    if(!navigator.onLine) throw new Error("offline");
+    await cplSyncPost(items);
+    cplSyncSetStatus("Synced to the cloud — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+  }catch(e){ cplSyncSetStatus("Saved on this device — will sync when online"); }
+}
+async function cplSyncAll(){
+  const c = cplSyncCfg(); if(!c) return null;
+  if(!navigator.onLine){ cplSyncSetStatus("Offline — will sync when online"); return null; }
+  try{
+    cplSyncSetStatus("Syncing…");
+    const r = await fetch(c.url + (c.url.indexOf("?")>=0 ? "&" : "?") + "key=" + encodeURIComponent(c.key));
+    const j = await r.json();
+    if(j.error) throw new Error(j.error);
+    const db = cplDbLoad(), remote = {}; let pulled = 0;
+    (j.items||[]).forEach(it=>{
+      remote[it.date+"|"+it.section] = it.updated || "";
+      const cur = db.records[it.date] && db.records[it.date][it.section];
+      if(!cur || (it.updated||"") > (cur.updated||"")){
+        if(!db.records[it.date]) db.records[it.date] = {};
+        db.records[it.date][it.section] = it.payload; pulled++;
+      }
+    });
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    const push = [];
+    Object.keys(db.records).forEach(d=>Object.keys(db.records[d]).forEach(s=>{
+      const p = db.records[d][s], ru = remote[d+"|"+s];
+      if(ru === undefined || (p.updated||"") > ru) push.push({ date:d, section:s, updated:p.updated, payload:p });
+    }));
+    for(let i=0;i<push.length;i+=15) await cplSyncPost(push.slice(i,i+15));
+    cplSyncSetStatus("Synced — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " (received " + pulled + ", sent " + push.length + ")");
+    if(typeof window.cplAfterSync === "function") window.cplAfterSync();
+    return { pulled:pulled, pushed:push.length };
+  }catch(e){
+    cplSyncSetStatus("Sync problem: " + (e && e.message ? e.message : "check internet and the Share setup"));
+    return null;
+  }
+}
+window.addEventListener("load", ()=>{ if(cplSyncCfg()) setTimeout(cplSyncAll, 1500); });
+window.addEventListener("online", ()=>{ if(cplSyncCfg()) cplSyncAll(); });
 
 // ============================ HELPERS ============================
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -167,7 +265,11 @@ function sourceRecords(ym){
 }
 function monthDays(ym){
   const recs = sourceRecords(ym), out = [];
-  Object.keys(recs).sort().forEach(date=>{ if(date.slice(0,7)===ym) out.push(aggregate(date, recs[date])); });
+  Object.keys(recs).sort().forEach(date=>{
+    if(date.slice(0,7)!==ym) return;
+    const live = {}; Object.keys(recs[date]).forEach(sec=>{ if(recs[date][sec] && !recs[date][sec].deleted) live[sec] = recs[date][sec]; });
+    if(Object.keys(live).length) out.push(aggregate(date, live));
+  });
   return out;
 }
 function summarize(days){
@@ -301,7 +403,9 @@ function refresh(){
 }
 function deleteDay(date){
   if(!confirm("Delete ALL saved records for "+niceDate(date)+"? This cannot be undone.")) return;
-  const db = cplDbLoad(); delete db.records[date]; cplDbSaveAll(db); refresh();
+  const db = cplDbLoad(), now = new Date().toISOString(), items = [];
+  Object.keys(db.records[date]||{}).forEach(sec=>{ const t = { deleted:true, updated:now }; db.records[date][sec] = t; items.push({date:date, section:sec, updated:now, payload:t}); });
+  cplDbSaveAll(db); cplSyncPush(items); refresh();
 }
 function toggleSample(){ SAMPLE = !SAMPLE; refresh(); }
 
@@ -332,7 +436,7 @@ function importBackup(ev){
           else if((src[sec].updated||"") > (cur.updated||"")){ db.records[date][sec]=src[sec]; updated++; }
         });
       });
-      cplDbSaveAll(db);
+      cplDbSaveAll(db); setTimeout(cplSyncAll, 500);
       alert("Backup restored. New entries: "+added+", updated entries: "+updated+".");
       SAMPLE=false; refresh();
     }catch(e){ alert("That file is not a valid CPL records backup."); }
@@ -342,7 +446,7 @@ function importBackup(ev){
 }
 function backupInfo(){
   let last = null; try{ last = localStorage.getItem(CPL_BACKUP_KEY); }catch(e){}
-  const count = Object.keys(cplDbLoad().records).length;
+  const recsAll = cplDbLoad().records; const count = Object.keys(recsAll).filter(d=>Object.keys(recsAll[d]).some(k=>recsAll[d][k] && !recsAll[d][k].deleted)).length;
   document.getElementById("backup-info").textContent = (last ? "Last backup: "+new Date(last).toLocaleDateString("en-GB") : "You have not downloaded a backup yet.") + " • Days stored on this device: " + count;
   const w = document.getElementById("backup-warn");
   const old = !last || (Date.now()-new Date(last).getTime()) > 14*86400000;
@@ -515,6 +619,47 @@ function generateMonthlyPDF(){
   doc.save(`${title} Monthly Poultry Records${SAMPLE?" SAMPLE":""}.pdf`);
 }
 
+
+// ============================ SHARE SETUP ============================
+const GAS_TEMPLATE = "const KEY = \"__PASS__\";\nfunction sheet_(){\n  const props = PropertiesService.getScriptProperties();\n  let ss = null, id = props.getProperty(\"SSID\");\n  if(id){ try{ ss = SpreadsheetApp.openById(id); }catch(e){} }\n  if(!ss){\n    const lock = LockService.getScriptLock(); lock.waitLock(25000);\n    try{\n      id = props.getProperty(\"SSID\");\n      if(id){ try{ ss = SpreadsheetApp.openById(id); }catch(e){} }\n      if(!ss){\n        ss = SpreadsheetApp.create(\"CPL Poultry Records (cloud sync)\");\n        props.setProperty(\"SSID\", ss.getId());\n      }\n    } finally { lock.releaseLock(); }\n  }\n  let s = ss.getSheetByName(\"records\");\n  if(!s){\n    s = ss.getSheets()[0]; s.setName(\"records\");\n    s.getRange(\"A:E\").setNumberFormat(\"@\"); s.appendRow([\"id\",\"date\",\"section\",\"updated\",\"json\"]);\n  }\n  return s;\n}\nfunction out_(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\nfunction doGet(e){\n  if(e.parameter.key !== KEY) return out_({error:\"Wrong passphrase\"});\n  const rows = sheet_().getDataRange().getValues(); rows.shift();\n  return out_({ok:true, items: rows.filter(r=>r[0]).map(r=>({date:String(r[1]), section:String(r[2]), updated:String(r[3]), payload:JSON.parse(r[4])}))});\n}\nfunction doPost(e){\n  const b = JSON.parse(e.postData.contents);\n  if(b.key !== KEY) return out_({error:\"Wrong passphrase\"});\n  const s = sheet_();\n  const lock = LockService.getScriptLock(); lock.waitLock(25000);\n  try{\n    const data = s.getDataRange().getValues(), idx = {};\n    data.forEach((r,i)=>{ idx[r[0]] = i+1; });\n    b.items.forEach(it=>{\n      const id = it.date + \"|\" + it.section;\n      const row = [id, it.date, it.section, it.updated, JSON.stringify(it.payload)];\n      if(idx[id]){\n        if(String(it.updated) > String(data[idx[id]-1][3])){ s.getRange(idx[id],1,1,5).setValues([row]); data[idx[id]-1] = row; }\n      } else { s.appendRow(row); data.push(row); idx[id] = data.length; }\n    });\n  } finally { lock.releaseLock(); }\n  return out_({ok:true});\n}\n";
+function copyScript(){
+  const pass = document.getElementById("sync-pass").value.trim();
+  if(!pass){ alert("Type your secret passphrase first."); return; }
+  const code = GAS_TEMPLATE.replace("__PASS__", pass.replace(/["\\]/g,""));
+  const done = ()=>alert("Script copied. Now paste it into the Apps Script editor (step 3).");
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, ()=>fallbackCopy(code, done));
+  else fallbackCopy(code, done);
+}
+function fallbackCopy(text, done){
+  const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select();
+  try{ document.execCommand("copy"); done(); }catch(e){ alert("Could not copy automatically."); }
+  t.remove();
+}
+function showSyncState(){
+  const c = cplSyncCfg();
+  document.getElementById("share-connected").style.display = c ? "block" : "none";
+  document.getElementById("share-setup").open = !c;
+  let st = null; try{ st = localStorage.getItem("cpl_sync_status"); }catch(e){}
+  document.getElementById("sync-status").textContent = c ? (st || "Connected.") : "Not connected on this device.";
+  if(c){ document.getElementById("sync-url").value = c.url; document.getElementById("sync-pass").value = c.key; }
+}
+async function connectSync(){
+  const url = document.getElementById("sync-url").value.trim(), key = document.getElementById("sync-pass").value.trim();
+  if(!/^https:\/\/script\.google\.com\//.test(url)){ alert("The URL must start with https://script.google.com/ and come from the Deploy step."); return; }
+  if(!key){ alert("Type the secret passphrase."); return; }
+  try{ localStorage.setItem(CPL_SYNC_KEY, JSON.stringify({url:url, key:key})); }catch(e){ alert("Could not save the settings on this device."); return; }
+  const r = await cplSyncAll();
+  if(r){ alert("Connected. Received "+r.pulled+" and sent "+r.pushed+" record(s)."); } else { const why = document.getElementById("sync-status").textContent; try{ localStorage.removeItem(CPL_SYNC_KEY); }catch(e){} showSyncState(); document.getElementById("sync-status").textContent = why; document.getElementById("sync-url").value = url; document.getElementById("sync-pass").value = key; alert("Could not sync (" + why + "). Usually the passphrase differs from the one in the script, or the deployment is not set to 'Anyone'."); }
+  showSyncState();
+}
+async function syncNowClick(){ await cplSyncAll(); showSyncState(); }
+function disconnectSync(){
+  if(!confirm("Disconnect this device from the cloud? Records already on this device stay.")) return;
+  try{ localStorage.removeItem(CPL_SYNC_KEY); localStorage.removeItem("cpl_sync_status"); }catch(e){}
+  showSyncState();
+}
+window.cplAfterSync = function(){ try{ refresh(); showSyncState(); }catch(e){} };
+
 // ============================ START ============================
 (function init(){
   const db = cplDbLoad(); const dates = Object.keys(db.records).sort();
@@ -523,7 +668,7 @@ function generateMonthlyPDF(){
   if(dates.length && !dates.some(d=>d.slice(0,7)===ym)) ym = dates[dates.length-1].slice(0,7);
   document.getElementById("month").value = ym;
   document.getElementById("month").addEventListener("change", refresh);
-  refresh();
+  refresh(); showSyncState();
   if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
     window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
   }
