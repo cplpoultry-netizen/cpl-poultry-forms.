@@ -457,7 +457,7 @@
         <thead>
           <tr>
             <th rowspan="2">House</th><th rowspan="2">Feed Type</th>
-            <th colspan="3">Feed (kg)</th>
+            <th colspan="3">Next Feed Ratio (kg)</th>
             <th colspan="2">Water Reading</th>
             <th rowspan="2">Consumption in Litres (L)</th>
           </tr>
@@ -1723,7 +1723,7 @@ function generatePDF(){
     styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
     head:[
-      [{content:"House",rowSpan:2},{content:"Feed Type",rowSpan:2},{content:"Feed (kg)",colSpan:3},{content:"Water Reading",colSpan:2},{content:"Consumption in Litres (L)",rowSpan:2}],
+      [{content:"House",rowSpan:2},{content:"Feed Type",rowSpan:2},{content:"Next Feed Ratio (kg)",colSpan:3},{content:"Water Reading",colSpan:2},{content:"Consumption in Litres (L)",rowSpan:2}],
       ["Male","Female","Total","Morning","Afternoon"]
     ],
     body: d.feed.map(r=>[r.house, r.type, r.male, r.female, r.total, r.waterAM, r.waterPM, r.consumption]),
