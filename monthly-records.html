@@ -282,6 +282,7 @@ function summarize(days){
   S.hatchPct = S.eggs ? (S.hatch||0)/S.eggs*100 : null;
   S.mortM=tot("mortM"); S.mortF=tot("mortF"); S.mortT=tot("mortT");
   S.feed=tot("feedT"); S.feedM=tot("feedM"); S.feedF=tot("feedF"); S.water=tot("water"); S.stockKg=tot("stockKg");
+  S.storeSum=tot("eggTotalStore"); S.curSum=tot("eggStore");
   S.hSet=tot("h_eggSet"); S.hFertile=tot("h_fertile"); S.hHatch=tot("h_hatchChicks"); S.hSalable=tot("h_salable");
   S.hPct = S.hFertile ? (S.hHatch||0)/S.hFertile*100 : null;
   S.hBatches = tot("hCount");
@@ -356,6 +357,7 @@ function kpiPairs(S){
     [fmt(S.hatch)+(S.hatchPct!==null?" ("+fmt(S.hatchPct)+"%)":""),"Hatchery eggs"], [fmt(S.table),"Table eggs"], [fmt(S.smash),"Smash eggs"],
     [fmt(S.mortT),"Total mortality"], [fmt(S.mortM)+" M / "+fmt(S.mortF)+" F","Male / Female mortality"],
     [fmt(S.remT),"Birds remaining (latest)"], [fmt(S.feed),"Feed given (kg)"], [fmt(S.water),"Water (litres)"], [fmt(S.stockKg),"Feed stock recorded (kg)"],
+    [fmt(S.storeSum),"Storage eggs — all days added up"], [fmt(S.curSum),"Current storage — all days added up"],
     [fmt(S.hBatches),"Hatchery batches"], [fmt(S.hSet),"Eggs set"], [fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"], [fmt(S.hSalable),"Salable chicks"]
   ];
 }
@@ -370,15 +372,20 @@ function refresh(){
   document.getElementById("kpis").innerHTML = days.length ? kpiPairs(S).map(k=>kpi(k[0],k[1])).join("") : '<div class="nodata" style="grid-column:1/-1;">Nothing to summarise yet.</div>';
   renderCharts(S);
   const t = document.getElementById("days-table");
-  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Mortality</th><th></th></tr></thead>";
+  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Storage eggs</th><th>Mortality</th><th></th></tr></thead>";
   const tb = document.createElement("tbody");
   days.forEach(d=>{
     const tr = document.createElement("tr");
-    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.mortT===undefined?null:d.mortT)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.eggTotalStore===undefined?null:d.eggTotalStore), fmt(d.mortT===undefined?null:d.mortT)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
     const td = document.createElement("td");
     if(!SAMPLE){ const b=document.createElement("button"); b.className="danger"; b.textContent="Delete"; b.style.padding="4px 8px"; b.onclick=()=>deleteDay(d.date); td.appendChild(b); }
     tr.appendChild(td); tb.appendChild(tr);
   });
+  if(days.length){
+    const tr = document.createElement("tr"); tr.style.fontWeight = "800";
+    ["MONTH TOTAL","","","",fmt(S.eggs),fmt(S.storeSum),fmt(S.mortT),""].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    tb.appendChild(tr);
+  }
   t.appendChild(tb);
   backupInfo();
 }
@@ -498,7 +505,7 @@ function generateMonthlyPDF(){
     doc.addPage = function(f,o){ return origAddPage(f||"a4", o||orient); };
     const opts = Object.assign({}, tableDefaults, { startY:y+12, head:[head], body, columnStyles:colStyles||{}, styles:Object.assign({},tableDefaults.styles,{halign:"center"}),
       didDrawPage:(data)=>{ if(data.pageNumber !== startPage) banner(heading+" (continued)"); } });
-    if(foot) opts.foot=[foot];
+    if(foot) opts.foot = Array.isArray(foot[0]) ? foot : [foot];
     try{ doc.autoTable(opts); } finally { doc.addPage = origAddPage; }
   }
   // ---- Page 1: cover & summary (first page) ----
@@ -538,12 +545,14 @@ function generateMonthlyPDF(){
   const E = (v)=>fmt(v===undefined?null:v);
   const T = (k)=>fmt(sum(days.map(d=>d[k]===undefined?null:d[k])));
   const lastOf = (k)=>{ let v=null; days.forEach(d=>{ if(d[k]!==undefined && d[k]!==null) v=d[k]; }); return fmt(v); };
-  sectionTable("Days Recorded", ["Date","Checklist","Feed stock","Hatchery","Eggs","Mortality"],
-    days.map(d=>[niceDate(d.date), d.hasChecklist?"Yes":"—", d.hasFeedStock?"Yes":"—", d.hasHatchery?"Yes":"—", E(d.eggTotal), E(d.mortT)]), null, "portrait");
+  sectionTable("Days Recorded", ["Date","Checklist","Feed stock","Hatchery","Eggs","Storage Eggs","Mortality"],
+    days.map(d=>[niceDate(d.date), d.hasChecklist?"Yes":"—", d.hasFeedStock?"Yes":"—", d.hasHatchery?"Yes":"—", E(d.eggTotal), E(d.eggTotalStore), E(d.mortT)]),
+    ["MONTH TOTAL","","","",fmt(S.eggs),fmt(S.storeSum),fmt(S.mortT)], "portrait");
   if(days.some(d=>d.hasChecklist)){
     sectionTable("Daily Egg Production", ["Date","9:00am","12:00pm","4:00pm","Total Eggs","Hatchery","Table","Smash","Hatchery %","Current Storage","Total Storage"],
       dayRows(d=>[niceDate(d.date),E(d.egg9),E(d.egg12),E(d.egg4),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),d.hatchPct===null||d.hatchPct===undefined?"—":fmt(d.hatchPct)+"%",E(d.eggStore),E(d.eggTotalStore)]),
-      ["TOTAL",T("egg9"),T("egg12"),T("egg4"),T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),S.hatchPct===null?"—":fmt(S.hatchPct)+"%","Last: "+lastOf("eggStore"),"Last: "+lastOf("eggTotalStore")], "landscape");
+      [["MONTH TOTAL",T("egg9"),T("egg12"),T("egg4"),T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),S.hatchPct===null?"—":fmt(S.hatchPct)+"%",T("eggStore"),T("eggTotalStore")],
+       ["LATEST DAY","","","","","","","","",lastOf("eggStore"),lastOf("eggTotalStore")]], "landscape");
     let cumT = 0;
     sectionTable("Birds & Mortality", ["Date","Mortality Male","Mortality Female","Not specified","Total Mortality","Cumulative","Remaining Male","Remaining Female","Remaining Total"],
       dayRows(d=>{ if(d.mortT!==null && d.mortT!==undefined) cumT+=d.mortT; return [niceDate(d.date),E(d.mortM),E(d.mortF),E(d.mortU),E(d.mortT),fmt(cumT),E(d.remM),E(d.remF),E(d.remT)]; }),
