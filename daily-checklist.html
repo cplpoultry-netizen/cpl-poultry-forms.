@@ -336,6 +336,13 @@
   .btn-primary{background:var(--amber);color:#fff;}
   .btn-secondary{background:var(--green-dark);color:#fff;}
   .hint{font-size:11px;color:#7a7a6d;margin-top:4px;}
+  /* Feed given (kg): Male, Female and Total in red */
+  [data-feed-male], [data-feed-female], [data-feed-total],
+  #ration-kgM, #ration-kgF, #ration-kgT{
+    color:#b3261e !important;
+    font-weight:800 !important;
+  }
+
   .save-flag{
     font-size:11.5px;
     color:var(--green-dark);
@@ -965,20 +972,37 @@ function addVaccRow(){
   const i = vaccRowCount++;
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td style="white-space:nowrap;">COBB <input type="number" min="1" data-vacc-housenum="${i}" style="width:46px;display:inline-block;"></td>
+    ${i === 0
+      ? `<td rowspan="2" style="white-space:nowrap;vertical-align:middle;">COBB <input type="number" min="1" data-vacc-housenum="0" oninput="syncVaccHouse()" style="width:46px;display:inline-block;"></td>`
+      : i === 1 ? ""
+      : `<td style="white-space:nowrap;">COBB <input type="number" min="1" data-vacc-housenum="${i}" style="width:46px;display:inline-block;"></td>`}
     <td><input data-vacc-vaccine="${i}" style="min-width:56px;"></td>
     <td><input type="number" min="0" data-vacc-mortality="${i}" oninput="checkMortalityAlert(${i}); updateBirdStock()" style="min-width:40px;"></td>
     <td>
-      <select data-vacc-gender="${i}" onchange="updateBirdStock()">
-        <option value="">-</option>
-        <option value="Male">Male</option>
+      ${i < 2
+        ? `<input data-vacc-gender="${i}" value="${i === 0 ? "Male" : "Female"}" readonly style="min-width:64px;background:#f0efe8;font-weight:700;text-align:center;">${i === 1 ? `<input type="hidden" data-vacc-housenum="1">` : ""}`
+        : `<select data-vacc-gender="${i}" onchange="updateBirdStock()">
+        <option value="Male" selected>Male</option>
         <option value="Female">Female</option>
-      </select>
+      </select>`}
     </td>
     <td><input data-vacc-finding="${i}" style="min-width:80px;"></td>
     <td><input data-vacc-action="${i}" style="min-width:64px;"></td>
   `;
   tbody.appendChild(tr);
+}
+
+// Male and Female share one house box (the first row); the second row copies it.
+function syncVaccHouse(){
+  const a = document.querySelector('[data-vacc-housenum="0"]'), b = document.querySelector('[data-vacc-housenum="1"]');
+  if(a && b) b.value = a.value;
+}
+
+// Rows 1 and 2 are printed as Male and Female and cannot be changed. Extra rows choose Male or Female.
+function vaccDefaultGenders(){
+  document.querySelectorAll("[data-vacc-gender]").forEach(sel=>{
+    if(sel.value === "") sel.value = (sel.getAttribute("data-vacc-gender") === "1") ? "Female" : "Male";
+  });
 }
 
 // Auto-fills the Action box when Mortality goes above 3. The box stays a normal
@@ -1169,6 +1193,7 @@ buildSetterTable();
 buildFanTable();
 addHouseRow();
 addFeedRow();
+addVaccRow();
 addVaccRow();
 refreshSignatureImages();
 rationInit();
@@ -1376,6 +1401,7 @@ function cplRestore(rec){
       if(cplSkipField(el)) return;
       if(f[k] !== undefined) el.value = f[k];
     });
+    vaccDefaultGenders(); syncVaccHouse();
     // keep the Remaining birds figure as it is now; this day's mortalities were already taken off it
     const s = loadBirdStock();
     const t = vaccMortalityTotals();
@@ -1702,6 +1728,13 @@ function generatePDF(){
     ],
     body: d.feed.map(r=>[r.house, r.type, r.male, r.female, r.total, r.waterAM, r.waterPM, r.consumption]),
     columnStyles:{0:{halign:"left",fontStyle:"bold"}, 1:{halign:"left"}, 7:{halign:"left"}},
+    // Feed (kg) Male, Female and Total in red, same as the app
+    didParseCell: function(data){
+      if(data.section === "body" && data.column.index >= 2 && data.column.index <= 4){
+        data.cell.styles.textColor = [179,38,30];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
   });
   y = doc.lastAutoTable.finalY + 12;
 
@@ -1718,7 +1751,13 @@ function generatePDF(){
     styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
     head:[["House","Vaccine","Mortality","Gender","Post-Mortem Finding","Action"]],
-    body: d.vacc.map(r=>[r.house, r.vaccine, r.mortality, r.gender, r.finding, r.action]),
+    // Male and Female (first two rows) share one merged House cell
+    body: d.vacc.map((r,idx)=>{
+      const rest = [r.vaccine, r.mortality, r.gender, r.finding, r.action];
+      if(idx === 0 && d.vacc.length >= 2) return [{content:r.house, rowSpan:2, styles:{valign:"middle", halign:"center"}}].concat(rest);
+      if(idx === 1) return rest;
+      return [r.house].concat(rest);
+    }),
     columnStyles:{0:{halign:"left",fontStyle:"bold"}, 4:{halign:"left"}, 5:{halign:"left"}},
   });
   y = doc.lastAutoTable.finalY + 6;
@@ -1802,6 +1841,8 @@ function clearForm(){
   if(!confirm("Clear all entered data?")) return;
   document.querySelectorAll("input").forEach(i=>i.value="");
   document.querySelectorAll("select").forEach(s=>s.value="");
+  vaccDefaultGenders();
+  syncVaccHouse();
   restoreBirdStock();
   formTouched = false;
   clearTimeout(_cplTimer);
