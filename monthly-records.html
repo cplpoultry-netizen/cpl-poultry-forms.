@@ -29,7 +29,7 @@
   .kpi{ border:1px solid var(--line); border-radius:8px; padding:10px; background:#fbfaf6; }
   .kpi b{ display:block; font-size:20px; color:var(--green-dark); }
   .kpi span{ font-size:11.5px; color:#6a6a5e; }
-  .charts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+  .charts{ display:block; }
   .chartbox{ border:1px solid var(--line); border-radius:8px; padding:8px; background:#fff; }
   .chartbox h3{ margin:0 0 6px; font-size:13px; color:var(--green-dark); }
   .chartbox .cv{ position:relative; height:240px; }
@@ -70,7 +70,7 @@
   </div>
 
   <div class="card">
-    <h2>Graphs</h2>
+    <h2>Graph</h2>
     <div class="charts" id="charts"></div>
   </div>
 
@@ -285,6 +285,7 @@ function summarize(days){
   S.hSet=tot("h_eggSet"); S.hFertile=tot("h_fertile"); S.hHatch=tot("h_hatchChicks"); S.hSalable=tot("h_salable");
   S.hPct = S.hFertile ? (S.hHatch||0)/S.hFertile*100 : null;
   S.hBatches = tot("hCount");
+  S.hInf=tot("h_infertile"); S.hDam=tot("h_damage"); S.hBomb=tot("h_bomb"); S.hMort=tot("h_mortality"); S.hCull=tot("h_cull"); S.hDic=tot("h_dic"); S.hUnh=tot("h_unhatched");
   S.fanDays = days.filter(d=>d.fanFaults>0).length;
   S.tempAM=avg(days.map(d=>d.hTempAM===undefined?null:d.hTempAM)); S.tempPM=avg(days.map(d=>d.hTempPM===undefined?null:d.hTempPM));
   let last=null; days.forEach(d=>{ if(d.remM!==null && d.remM!==undefined || d.remF!==null && d.remF!==undefined) last=d; });
@@ -293,80 +294,57 @@ function summarize(days){
 }
 
 // ============================ CHARTS ============================
-function seriesFor(ym, days, key){
-  const N = daysInMonth(ym), arr = new Array(N).fill(null);
-  days.forEach(d=>{ const v=d[key]; arr[parseInt(d.date.slice(8),10)-1] = (v===undefined||v===null)?null:r1(v); });
-  return arr;
-}
-function chartDefs(ym, days){
-  const N = daysInMonth(ym), labels = Array.from({length:N},(_,i)=>String(i+1));
-  const s = k=>seriesFor(ym,days,k);
-  const bar = (label,data,color,extra)=>Object.assign({type:"bar",label,data,backgroundColor:color,borderColor:color,borderWidth:1},extra||{});
-  const line = (label,data,color,extra)=>Object.assign({type:"line",label,data,borderColor:color,backgroundColor:color,borderWidth:2.5,pointRadius:3,tension:.25,spanGaps:true},extra||{});
-  const cum = (arr)=>{ let t=0; return arr.map(v=>{ if(v!==null) t+=v; return t||(v===null?null:0); }); };
-  const mm=s("mortM"), mf=s("mortF"), mt=s("mortT");
-  const defs = [
-    {title:"Egg production per day", yTitle:"Eggs", datasets:[bar("Total eggs",s("eggTotal"),C.green), line("Hatchery eggs",s("eggHatchery"),C.amber)]},
-    {title:"Egg breakdown (Hatchery / Table / Smash)", yTitle:"Eggs", stacked:true, datasets:[bar("Hatchery",s("eggHatchery"),C.green),bar("Table",s("eggTable"),C.amber),bar("Smash",s("eggSmash"),C.red)]},
-    {title:"Eggs collected by time of day", yTitle:"Eggs", stacked:true, datasets:[bar("9:00am",s("egg9"),C.leaf),bar("12:00pm",s("egg12"),C.amber),bar("4:00pm",s("egg4"),C.blue)]},
-    {title:"Egg storage", yTitle:"Eggs", datasets:[line("Current storage",s("eggStore"),C.blue),line("Total storage",s("eggTotalStore"),C.green)]},
-    {title:"Hatchery eggs as % of total eggs", yTitle:"%", datasets:[line("Hatchery %",s("hatchPct"),C.amber)]},
-    {title:"Mortality per day", yTitle:"Birds", datasets:[bar("Male",mm,C.blue),bar("Female",mf,C.pink),line("Cumulative total",cum(mt),C.red,{yAxisID:"y1"})], y1:"Cumulative"},
-    {title:"Remaining birds", yTitle:"Male", datasets:[line("Male (left)",s("remM"),C.blue),line("Female (right)",s("remF"),C.pink,{yAxisID:"y1"}),line("Total (right)",s("remT"),C.green,{yAxisID:"y1"})], y1:"Female / Total"},
-    {title:"Feed given per day", yTitle:"Kg", stacked:true, datasets:[bar("Male kg",s("feedM"),C.blue),bar("Female kg",s("feedF"),C.pink)]},
-    {title:"Water consumption", yTitle:"Litres", datasets:[line("Litres",s("water"),C.blue)]},
-    {title:"House temperature (average)", yTitle:"°C", datasets:[line("Morning",s("hTempAM"),C.amber),line("Afternoon",s("hTempPM"),C.red)]},
-    {title:"House humidity (average)", yTitle:"%", datasets:[line("Morning",s("hHumAM"),C.blue),line("Afternoon",s("hHumPM"),C.green)]},
-    {title:"Setter & Hatcher temperature (average)", yTitle:"°C", datasets:[line("Setters AM",s("sTempAM"),C.amber),line("Setters PM",s("sTempPM"),C.red),line("Hatchers AM",s("hcTempAM"),C.blue),line("Hatchers PM",s("hcTempPM"),C.green)]},
-    {title:"Setter & Hatcher humidity (average)", yTitle:"%", datasets:[line("Setters AM",s("sHumAM"),C.amber),line("Setters PM",s("sHumPM"),C.red),line("Hatchers AM",s("hcHumAM"),C.blue),line("Hatchers PM",s("hcHumPM"),C.green)]},
-    {title:"Egg temperature in setters (average)", yTitle:"°C", datasets:[line("Morning",s("eggTempAM"),C.amber),line("Afternoon",s("eggTempPM"),C.red)]},
-    {title:"Hatchery: eggs set, fertile, hatched & salable", yTitle:"Eggs / chicks", datasets:[bar("Egg set",s("h_eggSet"),C.green),bar("Candling fertile",s("h_fertile"),C.blue),bar("Hatch chicks",s("h_hatchChicks"),C.amber),bar("Salable chicks",s("h_salable"),C.red)]},
-    {title:"Hatchery: hatch % of fertile eggs", yTitle:"%", datasets:[line("Hatch % of fertile",s("hPct"),C.green)]},
-    {title:"Hatchery: losses (infertile, damage, bomb, unhatched)", yTitle:"Eggs", stacked:true, datasets:[bar("Infertile",s("h_infertile"),C.grey),bar("Damage",s("h_damage"),C.amber),bar("Bomb",s("h_bomb"),C.red),bar("Unhatched",s("h_unhatched"),C.pink)]},
-    {title:"Hatchery: chick mortality, cull & DIC", yTitle:"Chicks", stacked:true, datasets:[bar("Mortality",s("h_mortality"),C.red),bar("Cull",s("h_cull"),C.amber),bar("DIC",s("h_dic"),C.blue)]},
-    {title:"Faulty fans per day", yTitle:"Fans", datasets:[bar("Faulty fans",s("fanFaults"),C.red)], integer:true},
-    {title:"Feed stock recorded (Feed Stock Calculator)", yTitle:"Kg", datasets:[bar("Kg",s("stockKg"),C.green)]}
-  ];
-  defs.forEach(d=>{ d.labels = labels; d.has = d.datasets.some(ds=>ds.data.some(v=>v!==null)); });
-  return defs;
-}
 const whiteBg = { id:"whiteBg", beforeDraw(chart){ const ctx=chart.ctx; ctx.save(); ctx.globalCompositeOperation="destination-over"; ctx.fillStyle="#fff"; ctx.fillRect(0,0,chart.width,chart.height); ctx.restore(); } };
-function chartConfig(def, big){
-  const fs = big ? 15 : 11;
-  const scales = {
-    x:{ stacked:!!def.stacked, title:{display:true,text:"Day of the month",font:{size:fs}}, ticks:{font:{size:fs}}, grid:{display:false} },
-    y:{ stacked:!!def.stacked, beginAtZero:true, title:{display:true,text:def.yTitle,font:{size:fs}}, ticks:{font:{size:fs}, precision: def.integer?0:undefined, stepSize: def.integer?1:undefined} }
-  };
-  if(def.y1) scales.y1 = { position:"right", beginAtZero:true, grid:{drawOnChartArea:false}, title:{display:true,text:def.y1,font:{size:fs}}, ticks:{font:{size:fs}} };
-  const opts = {
-    animation:false, responsive:!big, maintainAspectRatio:false,
-    plugins:{ legend:{ position:"bottom", labels:{ font:{size:fs}, boxWidth:big?18:12 } }, title:{display:false} },
-    scales
-  };
-  return { data:{ labels:def.labels, datasets:def.datasets.map(d=>Object.assign({},d)) }, options:opts, plugins:[whiteBg] };
+function totalsFor(S){
+  const rows = [
+    ["Total eggs",S.eggs,C.green],["Hatchery eggs",S.hatch,C.green],["Table eggs",S.table,C.leaf],["Smash eggs",S.smash,C.red],
+    ["Mortality – Male",S.mortM,C.blue],["Mortality – Female",S.mortF,C.pink],
+    ["Feed given – Male (kg)",S.feedM,C.amber],["Feed given – Female (kg)",S.feedF,C.amber],
+    ["Water consumption (L)",S.water,C.blue],["Feed stock recorded (kg)",S.stockKg,C.light],
+    ["Hatchery: Egg set",S.hSet,C.green],["Hatchery: Infertile",S.hInf,C.grey],["Hatchery: Damage",S.hDam,C.grey],["Hatchery: Bomb",S.hBomb,C.grey],
+    ["Hatchery: Candling fertile",S.hFertile,C.blue],["Hatchery: Hatch chicks",S.hHatch,C.amber],["Hatchery: Chick mortality",S.hMort,C.red],
+    ["Hatchery: Cull",S.hCull,C.red],["Hatchery: DIC",S.hDic,C.red],["Hatchery: Salable chicks",S.hSalable,C.green],["Hatchery: Unhatched",S.hUnh,C.pink]
+  ];
+  return rows.filter(r=>r[1]!==null && r[1]!==undefined);
+}
+const valueLabels = { id:"valueLabels", afterDatasetsDraw(chart, args, opt){
+  const ctx = chart.ctx; ctx.save(); ctx.fillStyle = "#1f2a1f";
+  ctx.font = "bold " + ((opt && opt.size) || 11) + "px Segoe UI, Arial, sans-serif"; ctx.textBaseline = "middle";
+  chart.getDatasetMeta(0).data.forEach((bar, i)=>{ const v = chart.data.datasets[0].data[i]; ctx.fillText(Number(v).toLocaleString("en-US",{maximumFractionDigits:1}), bar.x + 6, bar.y); });
+  ctx.restore();
+} };
+function combinedConfig(S, big){
+  const rows = totalsFor(S), fs = big ? 16 : 11;
+  return { rows:rows, cfg:{ type:"bar",
+    data:{ labels:rows.map(r=>r[0]), datasets:[{ data:rows.map(r=>r[1]), backgroundColor:rows.map(r=>r[2]), borderWidth:0, barThickness:big?26:16 }] },
+    options:{ indexAxis:"y", animation:false, responsive:!big, maintainAspectRatio:false, layout:{ padding:{ right:big?100:60 } },
+      plugins:{ legend:{display:false}, title:{display:false}, valueLabels:{ size:fs } },
+      scales:{ x:{ beginAtZero:true, ticks:{font:{size:fs}}, title:{display:true, text:"Month total", font:{size:fs}} }, y:{ ticks:{font:{size:fs}}, grid:{display:false} } } },
+    plugins:[whiteBg, valueLabels] } };
 }
 let screenCharts = [];
-function renderCharts(ym, days){
+function renderCharts(S){
   screenCharts.forEach(c=>{ try{ c.destroy(); }catch(e){} }); screenCharts = [];
   const box = document.getElementById("charts"); box.innerHTML = "";
-  const defs = chartDefs(ym, days);
-  defs.forEach(def=>{
-    const wrap = document.createElement("div"); wrap.className="chartbox";
-    const h = document.createElement("h3"); h.textContent = def.title; wrap.appendChild(h);
-    if(!def.has){ const nd=document.createElement("div"); nd.className="nodata"; nd.textContent="No figures entered for this graph yet."; wrap.appendChild(nd); box.appendChild(wrap); return; }
-    if(typeof Chart === "undefined"){ const nd=document.createElement("div"); nd.className="nodata"; nd.textContent="Graphs need the chart library. Connect to the internet once and reload."; wrap.appendChild(nd); box.appendChild(wrap); return; }
-    const cv = document.createElement("div"); cv.className="cv"; const canvas = document.createElement("canvas"); cv.appendChild(canvas); wrap.appendChild(cv); box.appendChild(wrap);
-    const cfg = chartConfig(def,false);
-    screenCharts.push(new Chart(canvas.getContext("2d"), { type:"bar", data:cfg.data, options:cfg.options, plugins:cfg.plugins }));
-  });
+  const wrap = document.createElement("div"); wrap.className = "chartbox";
+  const h = document.createElement("h3"); h.textContent = "Month totals — every heading in one graph"; wrap.appendChild(h);
+  const rows = totalsFor(S);
+  if(!rows.length){ const nd = document.createElement("div"); nd.className = "nodata"; nd.textContent = "No figures entered for this month yet."; wrap.appendChild(nd); box.appendChild(wrap); return; }
+  if(typeof Chart === "undefined"){ const nd = document.createElement("div"); nd.className = "nodata"; nd.textContent = "The graph needs the chart library. Connect to the internet once and reload."; wrap.appendChild(nd); box.appendChild(wrap); return; }
+  const cv = document.createElement("div"); cv.style.cssText = "position:relative;height:" + (rows.length*28 + 70) + "px;";
+  const canvas = document.createElement("canvas"); cv.appendChild(canvas); wrap.appendChild(cv);
+  const p = document.createElement("p"); p.className = "hint"; p.textContent = "Each bar is the total for the month. Temperature, humidity, remaining birds and fan faults are not totals, so they appear in the tables only."; wrap.appendChild(p);
+  box.appendChild(wrap);
+  const c = combinedConfig(S, false).cfg;
+  screenCharts.push(new Chart(canvas.getContext("2d"), c));
 }
-function chartImage(def){
-  const canvas = document.createElement("canvas"); canvas.width=900; canvas.height=480;
-  const cfg = chartConfig(def,true);
-  const ch = new Chart(canvas.getContext("2d"), { type:"bar", data:cfg.data, options:cfg.options, plugins:cfg.plugins });
-  const url = canvas.toDataURL("image/png",1.0);
+function combinedImage(S){
+  const cc = combinedConfig(S, true), canvas = document.createElement("canvas");
+  canvas.width = 900; canvas.height = cc.rows.length*40 + 110;
+  const ch = new Chart(canvas.getContext("2d"), cc.cfg);
+  const url = canvas.toDataURL("image/png", 1.0);
   ch.destroy();
-  return url;
+  return { url:url, w:canvas.width, h:canvas.height };
 }
 
 // ============================ SCREEN ============================
@@ -387,7 +365,7 @@ function refresh(){
     kpi(fmt(S.remT),"Birds remaining (latest)"), kpi(fmt(S.feed),"Feed given (kg)"), kpi(fmt(S.water),"Water (litres)"), kpi(fmt(S.stockKg),"Feed stock recorded (kg)"),
     kpi(fmt(S.hBatches),"Hatchery batches"), kpi(fmt(S.hSet),"Eggs set"), kpi(fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"), kpi(fmt(S.hSalable),"Salable chicks")
   ].join("") : '<div class="nodata" style="grid-column:1/-1;">Nothing to summarise yet.</div>';
-  renderCharts(ym, days);
+  renderCharts(S);
   const t = document.getElementById("days-table");
   t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Mortality</th><th></th></tr></thead>";
   const tb = document.createElement("tbody");
@@ -489,9 +467,9 @@ function generateMonthlyPDF(){
   const ym = currentMonth(); const days = monthDays(ym);
   if(!days.length){ alert("No records for this month."); return; }
   if(!window.jspdf || !window.jspdf.jsPDF){ alert("The PDF library did not load. Connect to the internet once, reload this page and try again."); return; }
-  const defs = chartDefs(ym, days).filter(d=>d.has);
-  if(defs.length && typeof Chart === "undefined"){ alert("The chart library did not load. Connect to the internet once, reload and try again."); return; }
   const S = summarize(days), title = monthTitle(ym);
+  const hasTotals = totalsFor(S).length > 0;
+  if(hasTotals && typeof Chart === "undefined"){ alert("The chart library did not load. Connect to the internet once, reload and try again."); return; }
   const doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4", orientation:"portrait" });
   const GREEN=[43,65,39], AMBER=[201,138,44];
   const M = 28;
@@ -542,7 +520,7 @@ function generateMonthlyPDF(){
   doc.autoTable(Object.assign({}, tableDefaults, { startY:y+58, head:[["Measure","Month figure"]], body:kp, columnStyles:{0:{cellWidth:300},1:{halign:"right",fontStyle:"bold"}}, styles:{fontSize:10,cellPadding:5}, margin:{left:M,right:M,top:56,bottom:34} }));
   let yy = doc.lastAutoTable.finalY + 14;
   doc.setFontSize(9); doc.setTextColor(90,90,90);
-  doc.text("Contents: daily tables (eggs, birds & mortality, feed & water, environment), graphs, vaccination & mortality log, equipment remarks, feed stock records.", M, yy, {maxWidth:pw()-2*M});
+  doc.text("Contents: daily tables (eggs, birds & mortality, feed & water, environment), the month totals graph, vaccination & mortality log, equipment remarks, feed stock records.", M, yy, {maxWidth:pw()-2*M});
   doc.setTextColor(0,0,0);
 
   // ---- Landscape daily tables ----
@@ -581,16 +559,15 @@ function generateMonthlyPDF(){
     sectionTable("Hatchery Record — batch details", ["Record Date","Batch","Set Date","Transfer Date","Hatch Date","Egg Set","Candling Fertile","Hatch Chicks","Salable","Unhatched","Fertile %"], bRows, null, "landscape");
   }
 
-  // ---- Graph pages (2 per page, portrait) ----
-  for(let i=0;i<defs.length;i+=2){
-    let gy = newPage("portrait","Graphs");
-    [defs[i],defs[i+1]].forEach(def=>{
-      if(!def) return;
-      doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...GREEN); doc.text(def.title, M, gy+2); doc.setTextColor(0,0,0);
-      const img = chartImage(def), w = pw()-2*M, h = w*480/900;
-      doc.addImage(img,"PNG",M,gy+8,w,h);
-      gy += h + 34;
-    });
+  // ---- One combined bar graph (month totals) ----
+  if(hasTotals){
+    const gy = newPage("portrait","Graph");
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...GREEN); doc.text("Month totals — every heading in one graph", M, gy+2); doc.setTextColor(0,0,0);
+    const im = combinedImage(S), w = pw()-2*M, h = w*im.h/im.w;
+    doc.addImage(im.url,"PNG",M,gy+10,w,h);
+    doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(90,90,90);
+    doc.text("Each bar is the total for the month. Temperature, humidity, remaining birds and fan faults are not totals, so they appear in the tables only.", M, gy+h+24, {maxWidth:pw()-2*M});
+    doc.setTextColor(0,0,0);
   }
 
   // ---- Logs ----
