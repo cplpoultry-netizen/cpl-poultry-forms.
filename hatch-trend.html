@@ -23,7 +23,7 @@
   .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; }
   .kpi{ border:1px solid var(--line); border-radius:8px; padding:8px; text-align:center; background:#fbfaf5; }
   .kpi b{ display:block; font-size:20px; } .kpi span{ font-size:11px; color:#6b6b5e; }
-  .red{ color:var(--red); }
+  .red{ color:var(--red); } .navy{ color:#1f3b73; } .grn{ color:#2b6a3f; }
   table{ width:100%; border-collapse:collapse; font-size:12.5px; }
   th,td{ border:1px solid var(--line); padding:5px 6px; text-align:center; }
   th{ background:var(--green-dark); color:#fff; }
@@ -58,9 +58,16 @@
 
   <div class="card">
     <h2>Actual weekly average fertile % against the standard</h2>
-    <span class="chip" style="background:#7fbfc4;">Standard %Hatch</span><span class="chip" style="background:#b3261e;">Actual weekly average</span>
+    <span class="chip" style="background:#7fbfc4;">Standard %Hatch</span><span class="chip" style="background:#1f3b73;">Actual weekly average fertile %</span>
     <div class="chart-box"><canvas id="chartAct"></canvas></div>
     <p class="hint">Each week's dot is the average of the daily fertile % recorded in the Hatchery Record app for that week (Fertile Percentage = Hatch Chicks ÷ Candling Fertile × 100). The dashed line is the week we are in now.</p>
+  </div>
+
+  <div class="card">
+    <h2>Actual saleable chicks per week against the standard DOC</h2>
+    <span class="chip" style="background:#e11d1d;">Standard DOC</span><span class="chip" style="background:#2b6a3f;">Actual saleable chicks</span>
+    <div class="chart-box"><canvas id="chartSale"></canvas></div>
+    <p class="hint">Each green dot is the total Salable Chicks entered in the Hatchery Record for that week (all batches, all days). The red line is the standard weekly DOC production from the forecast.</p>
   </div>
 
   <div class="card">
@@ -92,7 +99,9 @@
 </footer>
 
 <script>
-// ====== Standard from the forecast PDF (Revise PNG 2026-2027) ======
+
+// ====== TREND CORE (same code in Hatchery Trend and Monthly Records) ======
+const TR_NAVY = "#1f3b73", TR_GREEN = "#2b6a3f", TR_STD_BLUE = "#7fbfc4", TR_DOC_RED = "#e11d1d";
 const STD = [
   { wk:43, lab:"15-Sep", hatch:80, doc:10000, hen:67 },
   { wk:47, lab:"OCT",    hatch:78, doc:9400,  hen:65 },
@@ -103,14 +112,140 @@ const STD = [
   { wk:67, lab:"MAR",    hatch:72, doc:6400,  hen:52 },
   { wk:70, lab:"APR",    hatch:70, doc:5000,  hen:48 }
 ];
-const CHICKS = [ ["APR",5000], ["MAY",0], ["JUN",3000], ["JULY",5000], ["AUG",10000], ["SEPT",10000] ];
 const STDW = STD.map(s=>s.wk);
-function stdAt(w){
-  if(w <= STD[0].wk) return STD[0].hatch;
-  if(w >= STD[STD.length-1].wk) return STD[STD.length-1].hatch;
+function stdAt(w, key){
+  key = key || "hatch";
+  if(w <= STD[0].wk) return STD[0][key];
+  if(w >= STD[STD.length-1].wk) return STD[STD.length-1][key];
   for(let i=0;i<STD.length-1;i++){ const a=STD[i], b=STD[i+1];
-    if(w>=a.wk && w<=b.wk) return a.hatch + (b.hatch-a.hatch)*(w-a.wk)/(b.wk-a.wk); }
+    if(w>=a.wk && w<=b.wk) return a[key] + (b[key]-a[key])*(w-a.wk)/(b.wk-a.wk); }
   return null;
+}
+function cplWeekRef(){
+  try{ const r = JSON.parse(localStorage.getItem("cpl_ration_v1")); if(r && r.ref && r.ref.date) return r.ref; }catch(e){}
+  return { date:"2026-11-09", week:50 };
+}
+function utc(iso){ const p = iso.split("-").map(Number); return Date.UTC(p[0], p[1]-1, p[2]); }
+function weekFor(iso){ const r = cplWeekRef(); return r.week + Math.floor((utc(iso) - utc(r.date)) / (7*86400000)); }
+function todayISO(){ const t=new Date(); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+const r1 = v => (Math.round(v*10)/10).toFixed(1);
+const thou = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+// weekly numbers from the saved Hatchery Records
+// avg  = average of the daily Fertile % (Hatch Chicks / Candling Fertile x 100) of that week
+// sale = total Salable Chicks of that week
+function trendWeeks(records, upTo){
+  const by = {};
+  Object.keys(records).sort().forEach(date=>{
+    if(upTo && date > upTo) return;
+    const h = records[date] && records[date].hatchery;
+    if(!h || h.deleted || !h.batches) return;
+    const ps = []; let sale = null;
+    h.batches.forEach(b=>{
+      const f = parseFloat(b.fertile), c = parseFloat(b.hatchChicks); if(!isNaN(f) && f > 0 && !isNaN(c)) ps.push(c/f*100);
+      const s = parseFloat(b.salable); if(!isNaN(s)) sale = (sale||0) + s;
+    });
+    if(!ps.length && sale === null) return;
+    const w = (typeof h.week === "number") ? h.week : weekFor(date);
+    (by[w] = by[w] || { days:[] }).days.push({ date:date, pct: ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : null, salable:sale });
+  });
+  trFinish(by); return by;
+}
+function trFinish(by){
+  Object.keys(by).forEach(w=>{
+    const d = by[w].days, fp = d.filter(x=>x.pct!==null), sl = d.filter(x=>x.salable!==null);
+    by[w].fdays = fp.length; by[w].avg = fp.length ? fp.reduce((a,x)=>a+x.pct,0)/fp.length : null;
+    by[w].sdays = sl.length; by[w].sale = sl.length ? sl.reduce((a,x)=>a+x.salable,0) : null;
+  });
+}
+function trRange(by){
+  const ws = Object.keys(by).map(Number);
+  return { min: Math.min(43, ...ws), max: Math.max(70, ...ws) };
+}
+
+// ---- chart helpers ----
+const valueLabels = { id:"valueLabels", afterDatasetsDraw(ch){
+  // Labels are placed one by one, newest/most important first. A label that would land on another label,
+  // or outside the graph, switches to the other side of its point; if neither side is free it is left out.
+  const ctx = ch.ctx, fs = ch.$fs || 11, pad = fs*0.28, placed = [], W = ch.width, H = ch.height;
+  const sets = [];
+  ch.data.datasets.forEach((ds,di)=>{ if(ds.vl) sets.push({ ds:ds, di:di, o:ds.vl }); });
+  sets.sort((a,b)=>(a.o.prio||5)-(b.o.prio||5));
+  const hit = (a,b)=>!(a.x1 < b.x0 || a.x0 > b.x1 || a.y1 < b.y0 || a.y0 > b.y1);
+  sets.forEach(S=>{
+    const pts = ch.getDatasetMeta(S.di).data, idx = pts.map((p,i)=>i); if(S.o.rev) idx.reverse();
+    idx.forEach(i=>{
+      const pt = pts[i], raw = S.ds.data[i], v = (raw && typeof raw === "object") ? raw.y : raw;
+      if(v == null || (S.o.only && !S.o.only(raw,i))) return;
+      const t = S.o.fmt(v,i), r = (pt.options && pt.options.radius) || 0;
+      ctx.font = "bold " + fs + "px Arial"; const tw = ctx.measureText(t).width, x = pt.x + (S.o.dx||0);
+      const pref = typeof S.o.pref === "function" ? S.o.pref(raw,i) : (S.o.pref || "up");
+      const tryDirs = pref === "down" ? ["down","up"] : ["up","down"];
+      for(const dir of tryDirs){
+        const base = dir === "up" ? pt.y - (r + fs*0.45 + pad + 2) : pt.y + (r + fs*0.95 + pad + 2);
+        const box = { x0:x - tw/2 - pad*1.6, x1:x + tw/2 + pad*1.6, y0:base - fs*0.85 - pad, y1:base + fs*0.25 + pad };
+        if(box.x0 < 1 || box.x1 > W-1 || box.y0 < 1 || box.y1 > H-1) continue;
+        if(placed.some(p=>hit(p,box))) continue;
+        placed.push(box);
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.strokeStyle = S.o.color || "#000"; ctx.lineWidth = Math.max(0.8, fs/12);
+        const w = box.x1-box.x0, h = box.y1-box.y0, rad = Math.min(h/2, fs*0.4);
+        ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(box.x0, box.y0, w, h, rad); else ctx.rect(box.x0, box.y0, w, h);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = S.o.color || "#000"; ctx.textAlign = "center"; ctx.fillText(t, x, base); ctx.restore();
+        break;
+      }
+    });
+  });
+}};
+const whiteBg = { id:"whiteBg", beforeDraw(ch){ const c = ch.ctx; c.save(); c.globalCompositeOperation="destination-over"; c.fillStyle="#fff"; c.fillRect(0,0,ch.width,ch.height); c.restore(); } };
+const nowLine = { id:"nowLine", afterDatasetsDraw(ch){
+  const w = ch.options.nowWeek, lo = ch.scales.x.min, hi = ch.scales.x.max; if(w == null || w < lo || w > hi) return;
+  const x = ch.scales.x.getPixelForValue(w), a = ch.chartArea, c = ch.ctx;
+  c.save(); c.setLineDash([5,4]); c.strokeStyle = "#555"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x,a.top); c.lineTo(x,a.bottom); c.stroke();
+  c.setLineDash([]); c.fillStyle = "#555"; c.font = "bold " + (ch.$fs||11) + "px Arial"; c.textAlign = "center"; c.fillText("Now: wk " + w, x, a.top - 4); c.restore();
+}};
+// k = size factor: 1 on screen, bigger for pictures that are shrunk into a PDF
+function actConfig(by, k, nowWeek){
+  const fs = 11*k, R = trRange(by);
+  const stdPts = []; for(let w=R.min; w<=R.max; w++) stdPts.push({ x:w, y:stdAt(w) });
+  const actPts = Object.keys(by).map(Number).sort((a,b)=>a-b).filter(w=>by[w].avg!==null).map(w=>({ x:w, y:Math.round(by[w].avg*10)/10 }));
+  return { type:"line", plugins:[valueLabels, nowLine, whiteBg],
+    data:{ datasets:[
+      { label:"Standard %Hatch", data:stdPts, borderColor:TR_STD_BLUE, backgroundColor:TR_STD_BLUE, borderWidth:4*k, tension:0,
+        pointRadius:c=>STDW.indexOf(c.raw.x) >= 0 ? 4*k : 0,
+        vl:{ fmt:v=>Math.round(v)+"%", color:"#2a6f74", prio:2, only:raw=>STDW.indexOf(raw.x) >= 0,
+          pref:raw=>{ const b = by[raw.x]; return (b && b.avg !== null && b.avg >= raw.y) ? "down" : "up"; } } },
+      { label:"Actual weekly average", data:actPts, borderColor:TR_NAVY, backgroundColor:TR_NAVY, borderWidth:3*k, tension:0, pointRadius:5*k, spanGaps:true,
+        vl:{ fmt:v=>r1(v)+"%", color:TR_NAVY, prio:1, rev:true, pref:raw=>raw.y >= stdAt(raw.x) ? "up" : "down" } } ] },
+    options:{ responsive:k===1, animation:false, maintainAspectRatio:false, nowWeek:nowWeek, layout:{ padding:{ top:18*k, right:8*k } },
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ min:0, max:100, grid:{ color:"#ebe8dc" }, ticks:{ stepSize:10, callback:v=>v+"%", font:{ size:fs, weight:"bold" } } },
+               x:{ type:"linear", min:R.min, max:R.max, ticks:{ stepSize:k===1?1:3, font:{ size:k===1?9:fs }, callback:v=>v+(k===1?"":"wk") }, title:{ display:true, text:"Flock age (weeks)", font:{ size:fs } } } } } };
+}
+function saleConfig(by, k, nowWeek){
+  const fs = 11*k, R = trRange(by);
+  const stdPts = []; for(let w=R.min; w<=R.max; w++) stdPts.push({ x:w, y:Math.round(stdAt(w,"doc")) });
+  const actPts = Object.keys(by).map(Number).sort((a,b)=>a-b).filter(w=>by[w].sale!==null).map(w=>({ x:w, y:by[w].sale }));
+  return { type:"line", plugins:[valueLabels, nowLine, whiteBg],
+    data:{ datasets:[
+      { label:"Standard DOC", data:stdPts, borderColor:TR_DOC_RED, backgroundColor:TR_DOC_RED, borderWidth:3*k, tension:0,
+        pointRadius:c=>STDW.indexOf(c.raw.x) >= 0 ? 4*k : 0,
+        vl:{ fmt:v=>thou(v), color:"#a31515", prio:2, only:raw=>STDW.indexOf(raw.x) >= 0,
+          pref:raw=>{ const b = by[raw.x]; return (b && b.sale !== null && b.sale >= raw.y) ? "down" : "up"; } } },
+      { label:"Actual saleable chicks", data:actPts, borderColor:TR_GREEN, backgroundColor:TR_GREEN, borderWidth:3*k, tension:0, pointRadius:5*k, spanGaps:true,
+        vl:{ fmt:v=>thou(v), color:TR_GREEN, prio:1, rev:true, pref:raw=>raw.y >= stdAt(raw.x,"doc") ? "up" : "down" } } ] },
+    options:{ responsive:k===1, animation:false, maintainAspectRatio:false, nowWeek:nowWeek, layout:{ padding:{ top:18*k, right:8*k } },
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ min:0, max:12000, grid:{ color:"#ebe8dc" }, ticks:{ stepSize:2000, font:{ size:fs, weight:"bold" } } },
+               x:{ type:"linear", min:R.min, max:R.max, ticks:{ stepSize:k===1?1:3, font:{ size:k===1?9:fs }, callback:v=>v+(k===1?"":"wk") }, title:{ display:true, text:"Flock age (weeks)", font:{ size:fs } } } } } };
+}
+// a picture of a chart for the PDF
+function trendImage(cfg, w, h, fontPx){
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.style.cssText = "position:fixed;left:-9999px;top:0;"; document.body.appendChild(cv);
+  cfg.options.devicePixelRatio = 1; cfg.options.responsive = false;
+  const ch = new Chart(cv, cfg); ch.$fs = fontPx; ch.update("none");
+  const url = cv.toDataURL("image/png"); ch.destroy(); cv.remove(); return url;
 }
 
 // ====== Records database (same one the other CPL apps use) ======
@@ -221,151 +356,94 @@ async function cplSyncAll(){
 window.addEventListener("load", ()=>{ if(cplSyncCfg()) setTimeout(cplSyncAll, 1500); });
 window.addEventListener("online", ()=>{ if(cplSyncCfg()) cplSyncAll(); });
 
-function cplWeekRef(){
-  try{ const r = JSON.parse(localStorage.getItem("cpl_ration_v1")); if(r && r.ref && r.ref.date) return r.ref; }catch(e){}
-  return { date:"2026-11-09", week:50 };
-}
-function utc(iso){ const p = iso.split("-").map(Number); return Date.UTC(p[0], p[1]-1, p[2]); }
-function weekFor(iso){ const r = cplWeekRef(); return r.week + Math.floor((utc(iso) - utc(r.date)) / (7*86400000)); }
-function todayISO(){ const t=new Date(); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
 
+const CHICKS = [ ["APR",5000], ["MAY",0], ["JUN",3000], ["JULY",5000], ["AUG",10000], ["SEPT",10000] ];
 let SAMPLE = false;
 function sampleWeeks(){
   const cw = weekFor(todayISO()), out = {};
   for(let w=cw-4; w<=cw; w++){
-    const base = stdAt(w) + (w%2 ? 3 : -2), days = [];
-    for(let d=0; d<3; d++) days.push({ date:"sample", pct: base + (d-1)*1.5, batches:1 });
+    const base = stdAt(w) + (w%2 ? 3 : -2), doc = stdAt(w,"doc"), days = [];
+    for(let d=0; d<3; d++) days.push({ date:"sample", pct: base + (d-1)*1.5, salable: Math.round(doc*(0.9+0.03*d)/3) });
     out[w] = { days:days };
   }
-  return out;
+  trFinish(out); return out;
 }
-function gatherWeeks(){
-  if(SAMPLE){ const o = sampleWeeks(); finish(o); return o; }
-  const db = cplDbLoad(), by = {}, today = todayISO();
-  Object.keys(db.records).sort().forEach(date=>{
-    if(date > today) return;
-    const h = db.records[date].hatchery;
-    if(!h || h.deleted || !h.batches) return;
-    const ps = [];
-    h.batches.forEach(b=>{ const f = parseFloat(b.fertile), c = parseFloat(b.hatchChicks); if(!isNaN(f) && f > 0 && !isNaN(c)) ps.push(c/f*100); });
-    if(!ps.length) return;
-    const day = ps.reduce((a,b)=>a+b,0)/ps.length;
-    const w = (typeof h.week === "number") ? h.week : weekFor(date);
-    (by[w] = by[w] || { days:[] }).days.push({ date:date, pct:day, batches:ps.length });
-  });
-  finish(by); return by;
-}
-function finish(by){ Object.keys(by).forEach(w=>{ const d = by[w].days; by[w].avg = d.reduce((a,x)=>a+x.pct,0)/d.length; }); }
-const r1 = v => (Math.round(v*10)/10).toFixed(1);
+function gatherWeeks(){ return SAMPLE ? sampleWeeks() : trendWeeks(cplDbLoad().records, todayISO()); }
 function niceDate(iso){ if(iso==="sample") return "sample"; const p=iso.split("-"); return p[2]+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+p[1]-1]+" "+p[0]; }
 
-// ====== Charts ======
-const valueLabels = { id:"valueLabels", afterDatasetsDraw(ch){
-  const ctx = ch.ctx;
-  ch.data.datasets.forEach((ds,di)=>{
-    const o = ds.vl; if(!o) return;
-    ch.getDatasetMeta(di).data.forEach((pt,i)=>{
-      const raw = ds.data[i], v = (raw && typeof raw === "object") ? raw.y : raw;
-      if(v == null || (o.only && !o.only(raw,i))) return;
-      ctx.save(); ctx.font = "bold " + (ch.$fs || 11) + "px Arial"; ctx.fillStyle = o.color || "#000"; ctx.textAlign = "center";
-      ctx.fillText(o.fmt(v,i), pt.x + (o.dx||0), pt.y + (o.dy==null ? -8 : o.dy)); ctx.restore();
-    });
-  });
-}};
-const whiteBg = { id:"whiteBg", beforeDraw(ch){ const c = ch.ctx; c.save(); c.globalCompositeOperation="destination-over"; c.fillStyle="#fff"; c.fillRect(0,0,ch.width,ch.height); c.restore(); } };
-const nowLine = { id:"nowLine", afterDatasetsDraw(ch){
-  const w = ch.options.nowWeek; if(w == null || w < 43 || w > 70) return;
-  const x = ch.scales.x.getPixelForValue(w), a = ch.chartArea, c = ch.ctx;
-  c.save(); c.setLineDash([5,4]); c.strokeStyle = "#b3261e"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x,a.top); c.lineTo(x,a.bottom); c.stroke();
-  c.setLineDash([]); c.fillStyle = "#b3261e"; c.font = "bold " + (ch.$fs||11) + "px Arial"; c.textAlign = "center"; c.fillText("Now: wk " + w, x, a.top - 4); c.restore();
-}};
+// ====== Standard chart exactly as the forecast PDF ======
 function stdConfig(pdf){
   const fs = pdf ? 17 : 11;
   return { type:"line", plugins:[valueLabels, whiteBg],
     data:{ labels: STD.map(s=>[s.wk+"wks", s.lab]), datasets:[
       { label:"%Hatch", data:STD.map(s=>s.hatch), yAxisID:"y", borderColor:"#aed9dc", backgroundColor:"#aed9dc", borderWidth:pdf?8:5, pointRadius:0, tension:0,
-        vl:{ fmt:v=>v+"%", color:"#000", dy:pdf?-14:-9 } },
+        vl:{ fmt:v=>v+"%", color:"#0b4f6c", prio:1, pref:"up" } },
       { label:"DOC", data:STD.map(s=>s.doc), yAxisID:"y2", borderColor:"#ff0000", backgroundColor:"#ff0000", borderWidth:pdf?6:3, pointRadius:0, tension:0,
-        vl:{ fmt:v=>String(v), color:"#000", dy:pdf?26:17 } } ] },
+        vl:{ fmt:v=>String(v), color:"#a31515", prio:2, pref:"down" } } ] },
     options:{ responsive:!pdf, animation:false, maintainAspectRatio:false, layout:{ padding:{ top:14, right:pdf?10:4 } },
       plugins:{ legend:{ display:false } },
       scales:{ y:{ min:0, max:90, ticks:{ stepSize:10, callback:v=>v+"%", font:{ size:fs, weight:"bold" } } },
                y2:{ position:"right", min:0, max:12000, grid:{ drawOnChartArea:false }, ticks:{ stepSize:2000, font:{ size:fs, weight:"bold" } } },
                x:{ ticks:{ font:{ size:fs } }, grid:{ display:false } } } } };
 }
-function actConfig(by, pdf){
-  const fs = pdf ? 16 : 11, cw = weekFor(todayISO());
-  const stdPts = []; for(let w=43; w<=70; w++) stdPts.push({ x:w, y:stdAt(w) });
-  const actPts = Object.keys(by).map(Number).sort((a,b)=>a-b).map(w=>({ x:w, y:Math.round(by[w].avg*10)/10 }));
-  return { type:"line", plugins:[valueLabels, nowLine, whiteBg],
-    data:{ datasets:[
-      { label:"Standard %Hatch", data:stdPts, borderColor:"#7fbfc4", backgroundColor:"#7fbfc4", borderWidth:pdf?7:4, tension:0,
-        pointRadius:c=>STDW.indexOf(c.raw.x) >= 0 ? (pdf?6:4) : 0,
-        vl:{ fmt:v=>Math.round(v)+"%", color:"#2a6f74", dy:pdf?30:19, only:raw=>STDW.indexOf(raw.x) >= 0 } },
-      { label:"Actual weekly average", data:actPts, borderColor:"#b3261e", backgroundColor:"#b3261e", borderWidth:pdf?5:3, tension:0, pointRadius:pdf?7:5, spanGaps:true,
-        vl:{ fmt:v=>r1(v)+"%", color:"#b3261e", dy:pdf?-14:-9 } } ] },
-    options:{ responsive:!pdf, animation:false, maintainAspectRatio:false, nowWeek:cw, layout:{ padding:{ top:18, right:pdf?10:6 } },
-      plugins:{ legend:{ display:false } },
-      scales:{ y:{ min:0, max:100, ticks:{ stepSize:10, callback:v=>v+"%", font:{ size:fs, weight:"bold" } } },
-               x:{ type:"linear", min:43, max:70, ticks:{ stepSize:pdf?3:1, font:{ size:pdf?15:9 }, callback:v=>v+(pdf?"wks":"") }, title:{ display:true, text:"Flock age (weeks)", font:{ size:fs } } } } } };
-}
-let cStd, cAct, cHen, cChicks;
+let cStd, cAct, cSale, cHen, cChicks;
 function drawCharts(by){
-  if(cStd) cStd.destroy(); if(cAct) cAct.destroy();
+  [cStd,cAct,cSale].forEach(c=>{ if(c) c.destroy(); });
+  const cw = weekFor(todayISO());
   cStd = new Chart(document.getElementById("chartStd"), stdConfig(false));
-  cAct = new Chart(document.getElementById("chartAct"), actConfig(by, false));
+  cAct = new Chart(document.getElementById("chartAct"), actConfig(by, 1, cw));
+  cSale = new Chart(document.getElementById("chartSale"), saleConfig(by, 1, cw));
   if(!cHen){
     cHen = new Chart(document.getElementById("chartHen"), { type:"bar", plugins:[valueLabels],
-      data:{ labels:STD.map(s=>[s.wk+"wks", s.lab]), datasets:[{ data:STD.map(s=>s.hen), backgroundColor:"#333399", borderColor:"#ff0000", borderWidth:1.5, vl:{ fmt:v=>v+"%", dy:-6 } }] },
+      data:{ labels:STD.map(s=>[s.wk+"wks", s.lab]), datasets:[{ data:STD.map(s=>s.hen), backgroundColor:"#333399", borderColor:"#ff0000", borderWidth:1.5, vl:{ fmt:v=>v+"%", color:"#333399", pref:"up" } }] },
       options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:16 } }, plugins:{ legend:{ display:false } }, scales:{ y:{ min:0, max:100, ticks:{ stepSize:10, callback:v=>v+"%" } }, x:{ grid:{ display:false } } } } });
     cChicks = new Chart(document.getElementById("chartChicks"), { type:"line", plugins:[valueLabels],
-      data:{ labels:CHICKS.map(c=>c[0]), datasets:[{ data:CHICKS.map(c=>c[1]), borderColor:"#ff0000", backgroundColor:"#ff0000", borderWidth:3, pointRadius:0, tension:0, vl:{ fmt:v=>String(v), dy:-8, dx:12 } }] },
+      data:{ labels:CHICKS.map(c=>c[0]), datasets:[{ data:CHICKS.map(c=>c[1]), borderColor:"#ff0000", backgroundColor:"#ff0000", borderWidth:3, pointRadius:0, tension:0, vl:{ fmt:v=>String(v), color:"#a31515", pref:"up", dx:12 } }] },
       options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:16, right:20 } }, plugins:{ legend:{ display:false } }, scales:{ y:{ min:0, max:10000, ticks:{ stepSize:1000 } }, x:{ grid:{ display:false } } } } });
   }
 }
 
 // ====== Numbers and page ======
-function summary(by){
-  const cw = weekFor(todayISO()), weeks = Object.keys(by).map(Number).sort((a,b)=>a-b);
-  const cur = by[cw], std = stdAt(cw);
-  const prevW = weeks.filter(w=>w<cw).pop();
-  const prev = prevW != null ? by[prevW] : null;
-  return { cw:cw, cur:cur, std:std, weeks:weeks, prev:prev, prevW:prevW };
-}
-function statusText(avg, std){
-  const d = avg - std;
+function statusText(v, std, unit){
+  const d = v - std, u = unit || " pts", f = unit ? thou : r1;
   if(Math.abs(d) < 0.05) return { t:"On the standard", c:"good" };
-  return d > 0 ? { t:"Above standard by "+r1(d)+" pts", c:"good" } : { t:"Below standard by "+r1(-d)+" pts", c:"bad" };
+  return d > 0 ? { t:"Above standard by "+f(d)+u, c:"good" } : { t:"Below standard by "+f(-d)+u, c:"bad" };
 }
 function render(){
-  const by = gatherWeeks(), S = summary(by);
+  const by = gatherWeeks(), cw = weekFor(todayISO());
+  const weeks = Object.keys(by).map(Number).sort((a,b)=>a-b), cur = by[cw];
+  const std = stdAt(cw), stdDoc = stdAt(cw,"doc");
   document.getElementById("sample-note").style.display = SAMPLE ? "block" : "none";
   document.getElementById("btn-sample").textContent = SAMPLE ? "Show my real records" : "Preview with sample data";
   const k = [];
-  k.push(['<span class="red">'+S.cw+'</span>', "Age (Weeks) now"]);
-  k.push([Math.round(S.std)+"%", "Standard %Hatch this week"]);
-  if(S.cur){
-    const st = statusText(S.cur.avg, S.std);
-    k.push(['<span class="red">'+r1(S.cur.avg)+"%</span>", "Actual average so far ("+S.cur.days.length+" day"+(S.cur.days.length===1?"":"s")+")"]);
-    k.push(['<span class="'+st.c+'" style="font-size:14px;">'+st.t+"</span>", "Against the standard"]);
-  } else {
-    k.push(["—", "Actual this week: no hatchery record yet"]);
-  }
-  if(S.prev && S.cur){ const diff = S.cur.avg - S.prev.avg; k.push([(diff>=0?"▲ ":"▼ ")+r1(Math.abs(diff))+" pts", "Change from week "+S.prevW]); }
+  k.push(['<span class="red">'+cw+'</span>', "Age (Weeks) now"]);
+  k.push([Math.round(std)+"%", "Standard %Hatch this week"]);
+  if(cur && cur.avg !== null){
+    const st = statusText(cur.avg, std);
+    k.push(['<span class="navy">'+r1(cur.avg)+"%</span>", "Actual fertile % so far ("+cur.fdays+" day"+(cur.fdays===1?"":"s")+")"]);
+    k.push(['<span class="'+st.c+'" style="font-size:14px;">'+st.t+"</span>", "Fertile % against the standard"]);
+    const prevW = weeks.filter(w=>w<cw && by[w].avg!==null).pop();
+    if(prevW != null){ const diff = cur.avg - by[prevW].avg; k.push([(diff>=0?"▲ ":"▼ ")+r1(Math.abs(diff))+" pts", "Change from week "+prevW]); }
+  } else k.push(["—", "Actual fertile %: no hatchery record yet this week"]);
+  k.push([thou(stdDoc), "Standard DOC for this week"]);
+  if(cur && cur.sale !== null){
+    k.push(['<span class="grn">'+thou(cur.sale)+"</span>", "Saleable chicks so far this week"]);
+    k.push([thou(Math.max(0, stdDoc - cur.sale)), "Still needed to reach the standard"]);
+  } else k.push(["—", "Saleable chicks: none entered yet this week"]);
   document.getElementById("kpis").innerHTML = k.map(x=>'<div class="kpi"><b>'+x[0]+"</b><span>"+x[1]+"</span></div>").join("");
-  // table
-  const wset = S.weeks.slice(); if(wset.indexOf(S.cw) < 0) wset.push(S.cw); wset.sort((a,b)=>a-b);
-  let h = "<tr><th>Age (Weeks)</th><th>Days</th><th>Actual avg %</th><th>Standard %</th><th>Difference</th><th>Status</th></tr>";
+  const wset = weeks.slice(); if(wset.indexOf(cw) < 0) wset.push(cw); wset.sort((a,b)=>a-b);
+  let h = "<tr><th>Age (Weeks)</th><th>Days</th><th>Actual fertile %</th><th>Standard %</th><th>Diff</th><th>Saleable chicks</th><th>Standard DOC</th><th>Diff</th></tr>";
   wset.forEach(w=>{
-    const b = by[w], sd = stdAt(w);
-    if(b){ const st = statusText(b.avg, sd), df = b.avg - sd;
-      h += "<tr><td><b>"+w+"</b></td><td>"+b.days.length+'</td><td class="red"><b>'+r1(b.avg)+"%</b></td><td>"+r1(sd)+"%</td><td>"+(df>=0?"+":"")+r1(df)+'</td><td class="'+st.c+'">'+st.t+"</td></tr>";
-    } else h += "<tr><td><b>"+w+"</b></td><td>0</td><td>—</td><td>"+r1(sd)+"%</td><td>—</td><td>No record yet</td></tr>";
+    const b = by[w], sd = stdAt(w), dc = stdAt(w,"doc");
+    let c1 = "<td>—</td>", c2 = "<td>—</td>", s1 = "<td>—</td>", s2 = "<td>—</td>";
+    if(b && b.avg !== null){ const df = b.avg - sd; c1 = '<td class="navy"><b>'+r1(b.avg)+"%</b></td>"; c2 = '<td class="'+(df>=0?"good":"bad")+'">'+(df>=0?"+":"")+r1(df)+"</td>"; }
+    if(b && b.sale !== null){ const df = b.sale - dc; s1 = '<td class="grn"><b>'+thou(b.sale)+"</b></td>"; s2 = '<td class="'+(df>=0?"good":"bad")+'">'+(df>=0?"+":"-")+thou(Math.abs(df))+"</td>"; }
+    h += "<tr><td><b>"+w+"</b></td><td>"+(b?b.days.length:0)+"</td>"+c1+"<td>"+r1(sd)+"%</td>"+c2+s1+"<td>"+thou(dc)+"</td>"+s2+"</tr>";
   });
   document.getElementById("wk-table").innerHTML = h;
-  document.getElementById("day-list").innerHTML = S.weeks.length ? S.weeks.slice().reverse().map(w=>"<p style='margin:6px 0;'><b>Week "+w+":</b> "+by[w].days.map(d=>niceDate(d.date)+" "+r1(d.pct)+"%").join(" · ")+"</p>").join("") : '<div class="nodata">No hatchery records with Candling Fertile and Hatch Chicks yet.</div>';
+  document.getElementById("day-list").innerHTML = weeks.length ? weeks.slice().reverse().map(w=>"<p style='margin:6px 0;'><b>Week "+w+":</b> "+by[w].days.map(d=>niceDate(d.date)+" — "+(d.pct!==null?r1(d.pct)+"%":"no fertile %")+(d.salable!==null?", "+thou(d.salable)+" saleable":"")).join(" · ")+"</p>").join("") : '<div class="nodata">No hatchery records yet.</div>';
   drawCharts(by);
-  window._by = by; window._S = S;
+  window._by = by;
 }
 window.cplAfterSync = function(){ render(); };
 function toggleSample(){ SAMPLE = !SAMPLE; render(); }
@@ -378,56 +456,56 @@ async function syncNow(){
 render();
 
 // ====== PDF ======
-function offImage(cfg, w, h){
-  const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.style.position="fixed"; cv.style.left="-9999px"; document.body.appendChild(cv);
-  cfg.options.devicePixelRatio = 1; const ch = new Chart(cv, cfg); ch.$fs = 17; ch.update("none");
-  const url = cv.toDataURL("image/png"); ch.destroy(); cv.remove(); return url;
-}
 function generatePDF(){
-  const by = window._by, S = window._S;
+  const by = window._by, cw0 = weekFor(todayISO()), cur = by[cw0], std = stdAt(cw0), stdDoc = stdAt(cw0,"doc");
   const { jsPDF } = window.jspdf, doc = new jsPDF({ unit:"pt", format:"a4" });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), mL = 36, mR = 36, cw = W - mL - mR;
-  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.setTextColor(43,65,39);
-  doc.text("HATCHERY TREND — ACTUAL AGAINST STANDARD", W/2, 36, { align:"center" });
-  doc.setFontSize(10); doc.setTextColor(0,0,0); doc.setFont("helvetica","normal");
-  doc.text("CPL Poultry Division — printed " + niceDate(todayISO()) + (SAMPLE ? " (SAMPLE DATA)" : ""), W/2, 50, { align:"center" });
-  doc.setFont("helvetica","bold"); doc.setTextColor(179,38,30);
-  let line = "Age (Weeks): " + S.cw + "     Standard %Hatch: " + Math.round(S.std) + "%";
-  if(S.cur) line += "     Actual so far: " + r1(S.cur.avg) + "%  (" + statusText(S.cur.avg, S.std).t + ")"; else line += "     Actual: no record yet this week";
-  doc.setFontSize(10); doc.text(line, mL, 70);
-  // chart 1
-  let y = 84;
-  doc.setTextColor(43,65,39); doc.setFontSize(11); doc.text("Standard — Weekly DOC Production Forecast (Revise PNG 2026-2027)", mL, y); y += 6;
+  const GREEN = [43,65,39];
+  function titleBar(sub){
+    doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.setTextColor(...GREEN);
+    doc.text("HATCHERY TREND — ACTUAL AGAINST STANDARD", W/2, 36, { align:"center" });
+    doc.setFontSize(10); doc.setTextColor(0,0,0); doc.setFont("helvetica","normal");
+    doc.text("CPL Poultry Division — printed " + niceDate(todayISO()) + (SAMPLE ? " (SAMPLE DATA)" : "") + (sub ? "   |   " + sub : ""), W/2, 50, { align:"center" });
+  }
+  function sub(text, y){ doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...GREEN); doc.text(text, mL, y); }
+  titleBar("Page 1 of 2");
+  doc.setFont("helvetica","bold"); doc.setTextColor(179,38,30); doc.setFontSize(10);
+  let line = "Age (Weeks): " + cw0 + "     Standard %Hatch: " + Math.round(std) + "%";
+  if(cur && cur.avg !== null) line += "     Actual so far: " + r1(cur.avg) + "%  (" + statusText(cur.avg, std).t + ")"; else line += "     Actual: no record yet this week";
+  doc.text(line, mL, 70);
+  let y = 84; sub("Standard — Weekly DOC Production Forecast (Revise PNG 2026-2027)", y); y += 6;
   const h1 = Math.round(cw*0.45);
-  doc.addImage(offImage(stdConfig(true), 1000, 450), "PNG", mL, y, cw, h1);
+  doc.addImage(trendImage(stdConfig(true), 1000, 450, 17), "PNG", mL, y, cw, h1);
   doc.setFillColor(13,110,253); doc.rect(mL+cw-150, y+6, 70, 14, "F"); doc.setTextColor(255,255,255); doc.setFontSize(9); doc.text("%Hatch", mL+cw-115, y+16, { align:"center" });
   doc.setFillColor(255,0,0); doc.rect(mL+cw-75, y+6, 60, 14, "F"); doc.text("DOC", mL+cw-45, y+16, { align:"center" });
   y += h1 + 14;
-  // chart 2
-  doc.setTextColor(43,65,39); doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.text("Actual weekly average fertile % against the standard", mL, y); y += 6;
-  doc.addImage(offImage(actConfig(by, true), 1000, 450), "PNG", mL, y, cw, h1);
+  sub("Actual weekly average fertile % against the standard", y); y += 6;
+  doc.addImage(trendImage(actConfig(by, 1.55, cw0), 1000, 450, 17), "PNG", mL, y, cw, h1);
   y += h1 + 12;
   doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(60,60,50);
-  const note = "Light blue line = standard %Hatch. Red line = actual weekly average of the daily Fertile Percentage (Hatch Chicks ÷ Candling Fertile × 100) from the Hatchery Record. Dashed line = the week we are in now.";
-  doc.text(doc.splitTextToSize(note, cw), mL, y);
-  // page 2 table
-  doc.addPage();
-  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(43,65,39); doc.text("Week by week", mL, 40);
-  const wset = S.weeks.slice(); if(wset.indexOf(S.cw) < 0) wset.push(S.cw); wset.sort((a,b)=>a-b);
-  const body = wset.map(w=>{ const b = by[w], sd = stdAt(w);
-    return b ? [String(w), String(b.days.length), r1(b.avg)+"%", r1(sd)+"%", (b.avg-sd>=0?"+":"")+r1(b.avg-sd), statusText(b.avg, sd).t]
-             : [String(w), "0", "—", r1(sd)+"%", "—", "No record yet"]; });
-  doc.autoTable({ startY:50, margin:{ left:mL, right:mR }, theme:"grid",
-    styles:{ fontSize:9, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+  doc.text(doc.splitTextToSize("Light blue line = standard %Hatch. Dark blue line = actual weekly average of the daily Fertile Percentage (Hatch Chicks ÷ Candling Fertile × 100) from the Hatchery Record. Dashed line = the week we are in now.", cw), mL, y);
+
+  doc.addPage(); titleBar("Page 2 of 2");
+  let y2 = 70; sub("Actual saleable chicks per week against the standard DOC", y2); y2 += 6;
+  const h2 = Math.round(cw*0.42);
+  doc.addImage(trendImage(saleConfig(by, 1.55, cw0), 1000, 420, 17), "PNG", mL, y2, cw, h2);
+  y2 += h2 + 8;
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(60,60,50);
+  doc.text(doc.splitTextToSize("Red line = standard weekly DOC production. Green line = actual weekly total of Salable Chicks from the Hatchery Record.", cw), mL, y2);
+  y2 += 22; sub("Week by week", y2);
+  const wset = Object.keys(by).map(Number).sort((a,b)=>a-b); if(wset.indexOf(cw0) < 0) wset.push(cw0); wset.sort((a,b)=>a-b);
+  const body = wset.map(w=>{ const b = by[w], sd = stdAt(w), dc = stdAt(w,"doc"), hasF = b && b.avg !== null, hasS = b && b.sale !== null;
+    return [String(w), String(b ? b.days.length : 0), hasF ? r1(b.avg)+"%" : "—", r1(sd)+"%", hasF ? (b.avg-sd>=0?"+":"")+r1(b.avg-sd) : "—", hasS ? thou(b.sale) : "—", thou(dc), hasS ? (b.sale-dc>=0?"+":"-")+thou(Math.abs(b.sale-dc)) : "—"]; });
+  doc.autoTable({ startY:y2+6, margin:{ left:mL, right:mR, bottom:50 }, theme:"grid",
+    styles:{ fontSize:8.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255] },
-    head:[["Age (Weeks)","Days counted","Actual average %","Standard %","Difference (pts)","Status"]], body:body,
-    columnStyles:{ 5:{ halign:"left" } }, rowPageBreak:"avoid",
-    didParseCell:function(d){ if(d.section==="body" && (d.column.index===0 || d.column.index===2)){ d.cell.styles.textColor=[179,38,30]; d.cell.styles.fontStyle="bold"; } } });
-  let y2 = doc.lastAutoTable.finalY + 16;
-  const foot = "Weekly average = all daily fertile percentages recorded in that week (from the first day of the week up to today) added up and divided by the number of days. A day with several batches counts as one day using the average of its batches.";
+    head:[["Age (Weeks)","Days","Actual fertile %","Standard %","Diff (pts)","Saleable chicks","Standard DOC","Diff"]], body:body, rowPageBreak:"avoid",
+    didParseCell:function(d){ if(d.section==="body"){ if(d.column.index===2){ d.cell.styles.textColor=[31,59,115]; d.cell.styles.fontStyle="bold"; } if(d.column.index===5){ d.cell.styles.textColor=[43,106,63]; d.cell.styles.fontStyle="bold"; } if(d.column.index===0){ d.cell.styles.fontStyle="bold"; } } } });
+  let y3 = doc.lastAutoTable.finalY + 14;
+  const foot = "Fertile % per week = all daily fertile percentages in that week (first day of the week up to today) added up and divided by the number of days; a day with several batches counts once using the average of its batches. Saleable chicks per week = the total of all Salable Chicks entered in that week.";
   const lines = doc.splitTextToSize(foot, cw);
-  if(y2 + lines.length*11 > H - 40){ doc.addPage(); y2 = 50; }
-  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(60,60,50); doc.text(lines, mL, y2);
+  if(y3 + lines.length*11 > H - 40){ doc.addPage(); y3 = 50; }
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(60,60,50); doc.text(lines, mL, y3);
   const nice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
   doc.save(nice + " Hatchery Trend.pdf");
 }
