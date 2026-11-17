@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hatchery Trend</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{ --ink:#1f2a1f; --paper:#f7f5ef; --green:#3f5d3a; --green-dark:#2b4127; --amber:#c98a2c; --red:#b3261e; --line:#d8d3c4; --card:#fff; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; padding-bottom:84px; }
+  header{ background:var(--green-dark); color:#fff; padding:16px 16px 14px; text-align:center; border-bottom:4px solid var(--amber); }
+  header h1{ margin:0; font-size:20px; }
+  header p{ margin:3px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{ max-width:900px; margin:0 auto; padding:12px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .card h2{ margin:0 0 8px; font-size:15px; color:var(--green-dark); }
+  .hint{ font-size:11.5px; color:#6b6b5e; margin:6px 0 0; }
+  .chart-box{ position:relative; height:300px; }
+  .chip{ display:inline-block; color:#fff; font-weight:700; font-size:12px; padding:3px 10px; margin:0 4px 6px 0; }
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; }
+  .kpi{ border:1px solid var(--line); border-radius:8px; padding:8px; text-align:center; background:#fbfaf5; }
+  .kpi b{ display:block; font-size:20px; } .kpi span{ font-size:11px; color:#6b6b5e; }
+  .red{ color:var(--red); }
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td{ border:1px solid var(--line); padding:5px 6px; text-align:center; }
+  th{ background:var(--green-dark); color:#fff; }
+  .scroll-x{ overflow-x:auto; }
+  .good{ color:#2a7a2a; font-weight:700; } .bad{ color:var(--red); font-weight:700; }
+  footer.bar{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); padding:10px; display:flex; gap:8px; justify-content:center; }
+  .btn{ border:0; border-radius:8px; padding:11px 18px; font-size:14px; font-weight:700; cursor:pointer; }
+  .btn-primary{ background:var(--green-dark); color:#fff; } .btn-secondary{ background:#e9e5d6; color:var(--ink); }
+  details summary{ cursor:pointer; font-weight:700; color:var(--green-dark); font-size:14px; }
+  .nodata{ text-align:center; color:#6b6b5e; font-size:13px; padding:14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hatchery Trend</h1>
+  <p>CPL Poultry Division — actual fertile % against the standard</p>
+  <p id="sync-status" style="font-size:12px;"></p>
+</header>
+<div class="wrap">
+
+  <div class="card">
+    <h2>Where we are now</h2>
+    <div class="kpis" id="kpis"></div>
+    <p class="hint" id="sample-note" style="display:none;color:#b3261e;font-weight:700;">SAMPLE DATA is showing — tap "Show my real records" below to go back.</p>
+  </div>
+
+  <div class="card">
+    <h2>Standard — Weekly DOC Production Forecast (Revise PNG 2026-2027)</h2>
+    <span class="chip" style="background:#0d6efd;">%Hatch</span><span class="chip" style="background:#ff0000;">DOC</span>
+    <div class="chart-box"><canvas id="chartStd"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Actual weekly average fertile % against the standard</h2>
+    <span class="chip" style="background:#7fbfc4;">Standard %Hatch</span><span class="chip" style="background:#b3261e;">Actual weekly average</span>
+    <div class="chart-box"><canvas id="chartAct"></canvas></div>
+    <p class="hint">Each week's dot is the average of the daily fertile % recorded in the Hatchery Record app for that week (Fertile Percentage = Hatch Chicks ÷ Candling Fertile × 100). The dashed line is the week we are in now.</p>
+  </div>
+
+  <div class="card">
+    <h2>Week by week</h2>
+    <div class="scroll-x"><table id="wk-table"></table></div>
+    <details style="margin-top:10px;"><summary>Days counted in each week</summary><div id="day-list" style="margin-top:8px;font-size:12.5px;"></div></details>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>Standard — Hen Day % and Chicks forecast (reference)</summary>
+      <div style="margin-top:10px;">
+        <p style="font-size:12.5px;margin:0 0 6px;"><b>Hen Day %</b> — 2660 hens, daily eggs production 1800 pcs. Flock sold APR 2027.</p>
+        <div class="chart-box" style="height:240px;"><canvas id="chartHen"></canvas></div>
+        <p style="font-size:12.5px;margin:14px 0 6px;"><b>Chicks forecast 2027</b> — start to buy eggs from outside for 4 months (APR to JUNE 2027), 5000 eggs / week to maintain production. House 2: PS chicks intake 3000 PS NOV 2026 (cancelled). House 1: flock sold APR 2027.</p>
+        <div class="chart-box" style="height:240px;"><canvas id="chartChicks"></canvas></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <button class="btn btn-secondary" onclick="syncNow()">Refresh / Sync now</button>
+    <button class="btn btn-secondary" id="btn-sample" onclick="toggleSample()">Preview with sample data</button>
+  </div>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+// ====== Standard from the forecast PDF (Revise PNG 2026-2027) ======
+const STD = [
+  { wk:43, lab:"15-Sep", hatch:80, doc:10000, hen:67 },
+  { wk:47, lab:"OCT",    hatch:78, doc:9400,  hen:65 },
+  { wk:51, lab:"NOV",    hatch:76, doc:8800,  hen:63 },
+  { wk:55, lab:"DEC",    hatch:75, doc:8200,  hen:60 },
+  { wk:59, lab:"JAN",    hatch:74, doc:7600,  hen:58 },
+  { wk:63, lab:"FEB",    hatch:73, doc:7000,  hen:55 },
+  { wk:67, lab:"MAR",    hatch:72, doc:6400,  hen:52 },
+  { wk:70, lab:"APR",    hatch:70, doc:5000,  hen:48 }
+];
+const CHICKS = [ ["APR",5000], ["MAY",0], ["JUN",3000], ["JULY",5000], ["AUG",10000], ["SEPT",10000] ];
+const STDW = STD.map(s=>s.wk);
+function stdAt(w){
+  if(w <= STD[0].wk) return STD[0].hatch;
+  if(w >= STD[STD.length-1].wk) return STD[STD.length-1].hatch;
+  for(let i=0;i<STD.length-1;i++){ const a=STD[i], b=STD[i+1];
+    if(w>=a.wk && w<=b.wk) return a.hatch + (b.hatch-a.hatch)*(w-a.wk)/(b.wk-a.wk); }
+  return null;
+}
+
+// ====== Records database (same one the other CPL apps use) ======
+const CPL_DB_KEY = "cpl_records_v1";
+let _cplDbWarned = false;
+function cplDbLoad(){
+  try{
+    const r = JSON.parse(localStorage.getItem(CPL_DB_KEY));
+    if(r && r.records) return r;
+  }catch(e){}
+  return { version:1, records:{} };
+}
+function cplDbGet(date, section){
+  const db = cplDbLoad();
+  const x = db.records[date] && db.records[date][section];
+  return (x && !x.deleted) ? x : null;
+}
+function cplDbPut(date, section, payload){
+  try{
+    const db = cplDbLoad();
+    if(!db.records[date]) db.records[date] = {};
+    payload.updated = new Date().toISOString();
+    db.records[date][section] = payload;
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    try{ cplSyncPush([{ date:date, section:section, updated:payload.updated, payload:payload }]); }catch(e){}
+    return true;
+  }catch(e){
+    if(!_cplDbWarned){
+      _cplDbWarned = true;
+      alert("Could not save to the records database (storage full or blocked). Open the Monthly Records page and download a backup.");
+    }
+    return false;
+  }
+}
+function cplStatus(msg, ok){
+  const el = document.getElementById("rec-status");
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok === false ? "#ffb4ab" : "#cfe6c8";
+}
+// ---------- Cloud sync between devices (Google Sheet + Apps Script) ----------
+// Only active after you connect it on the Monthly Records page. Records still save on this device first.
+const CPL_SYNC_KEY = "cpl_sync_cfg";
+function cplSyncCfg(){
+  try{ const c = JSON.parse(localStorage.getItem(CPL_SYNC_KEY)); if(c && c.url && c.key) return c; }catch(e){}
+  return null;
+}
+function cplSyncSetStatus(m){
+  try{ localStorage.setItem("cpl_sync_status", m); }catch(e){}
+  const el = document.getElementById("sync-status"); if(el) el.textContent = m;
+}
+async function cplSyncPost(items){
+  const c = cplSyncCfg();
+  const r = await fetch(c.url, { method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({ key:c.key, items:items }) });
+  const j = await r.json();
+  if(j.error) throw new Error(j.error);
+  return j;
+}
+let _syncQueue = [], _syncTimer = null;
+function cplSyncPush(items){
+  if(!cplSyncCfg()) return;
+  _syncQueue = _syncQueue.concat(items);
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(cplSyncFlush, 2500);
+}
+async function cplSyncFlush(){
+  const map = {}; _syncQueue.forEach(it=>{ map[it.date+"|"+it.section] = it; }); _syncQueue = [];
+  const items = Object.values(map);
+  if(!items.length || !cplSyncCfg()) return;
+  try{
+    if(!navigator.onLine) throw new Error("offline");
+    await cplSyncPost(items);
+    cplSyncSetStatus("Synced to the cloud — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+  }catch(e){ cplSyncSetStatus("Saved on this device — will sync when online"); }
+}
+async function cplSyncAll(){
+  const c = cplSyncCfg(); if(!c) return null;
+  if(!navigator.onLine){ cplSyncSetStatus("Offline — will sync when online"); return null; }
+  try{
+    cplSyncSetStatus("Syncing…");
+    const r = await fetch(c.url + (c.url.indexOf("?")>=0 ? "&" : "?") + "key=" + encodeURIComponent(c.key));
+    const j = await r.json();
+    if(j.error) throw new Error(j.error);
+    const db = cplDbLoad(), remote = {}; let pulled = 0;
+    (j.items||[]).forEach(it=>{
+      remote[it.date+"|"+it.section] = it.updated || "";
+      const cur = db.records[it.date] && db.records[it.date][it.section];
+      if(!cur || (it.updated||"") > (cur.updated||"")){
+        if(!db.records[it.date]) db.records[it.date] = {};
+        db.records[it.date][it.section] = it.payload; pulled++;
+      }
+    });
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    const push = [];
+    Object.keys(db.records).forEach(d=>Object.keys(db.records[d]).forEach(s=>{
+      const p = db.records[d][s], ru = remote[d+"|"+s];
+      if(ru === undefined || (p.updated||"") > ru) push.push({ date:d, section:s, updated:p.updated, payload:p });
+    }));
+    for(let i=0;i<push.length;i+=15) await cplSyncPost(push.slice(i,i+15));
+    cplSyncSetStatus("Synced — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " (received " + pulled + ", sent " + push.length + ")");
+    if(typeof window.cplAfterSync === "function") window.cplAfterSync();
+    return { pulled:pulled, pushed:push.length };
+  }catch(e){
+    cplSyncSetStatus("Sync problem: " + (e && e.message ? e.message : "check internet and the Share setup"));
+    return null;
+  }
+}
+window.addEventListener("load", ()=>{ if(cplSyncCfg()) setTimeout(cplSyncAll, 1500); });
+window.addEventListener("online", ()=>{ if(cplSyncCfg()) cplSyncAll(); });
+
+function cplWeekRef(){
+  try{ const r = JSON.parse(localStorage.getItem("cpl_ration_v1")); if(r && r.ref && r.ref.date) return r.ref; }catch(e){}
+  return { date:"2026-11-09", week:50 };
+}
+function utc(iso){ const p = iso.split("-").map(Number); return Date.UTC(p[0], p[1]-1, p[2]); }
+function weekFor(iso){ const r = cplWeekRef(); return r.week + Math.floor((utc(iso) - utc(r.date)) / (7*86400000)); }
+function todayISO(){ const t=new Date(); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+
+let SAMPLE = false;
+function sampleWeeks(){
+  const cw = weekFor(todayISO()), out = {};
+  for(let w=cw-4; w<=cw; w++){
+    const base = stdAt(w) + (w%2 ? 3 : -2), days = [];
+    for(let d=0; d<3; d++) days.push({ date:"sample", pct: base + (d-1)*1.5, batches:1 });
+    out[w] = { days:days };
+  }
+  return out;
+}
+function gatherWeeks(){
+  if(SAMPLE){ const o = sampleWeeks(); finish(o); return o; }
+  const db = cplDbLoad(), by = {}, today = todayISO();
+  Object.keys(db.records).sort().forEach(date=>{
+    if(date > today) return;
+    const h = db.records[date].hatchery;
+    if(!h || h.deleted || !h.batches) return;
+    const ps = [];
+    h.batches.forEach(b=>{ const f = parseFloat(b.fertile), c = parseFloat(b.hatchChicks); if(!isNaN(f) && f > 0 && !isNaN(c)) ps.push(c/f*100); });
+    if(!ps.length) return;
+    const day = ps.reduce((a,b)=>a+b,0)/ps.length;
+    const w = (typeof h.week === "number") ? h.week : weekFor(date);
+    (by[w] = by[w] || { days:[] }).days.push({ date:date, pct:day, batches:ps.length });
+  });
+  finish(by); return by;
+}
+function finish(by){ Object.keys(by).forEach(w=>{ const d = by[w].days; by[w].avg = d.reduce((a,x)=>a+x.pct,0)/d.length; }); }
+const r1 = v => (Math.round(v*10)/10).toFixed(1);
+function niceDate(iso){ if(iso==="sample") return "sample"; const p=iso.split("-"); return p[2]+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+p[1]-1]+" "+p[0]; }
+
+// ====== Charts ======
+const valueLabels = { id:"valueLabels", afterDatasetsDraw(ch){
+  const ctx = ch.ctx;
+  ch.data.datasets.forEach((ds,di)=>{
+    const o = ds.vl; if(!o) return;
+    ch.getDatasetMeta(di).data.forEach((pt,i)=>{
+      const raw = ds.data[i], v = (raw && typeof raw === "object") ? raw.y : raw;
+      if(v == null || (o.only && !o.only(raw,i))) return;
+      ctx.save(); ctx.font = "bold " + (ch.$fs || 11) + "px Arial"; ctx.fillStyle = o.color || "#000"; ctx.textAlign = "center";
+      ctx.fillText(o.fmt(v,i), pt.x + (o.dx||0), pt.y + (o.dy==null ? -8 : o.dy)); ctx.restore();
+    });
+  });
+}};
+const whiteBg = { id:"whiteBg", beforeDraw(ch){ const c = ch.ctx; c.save(); c.globalCompositeOperation="destination-over"; c.fillStyle="#fff"; c.fillRect(0,0,ch.width,ch.height); c.restore(); } };
+const nowLine = { id:"nowLine", afterDatasetsDraw(ch){
+  const w = ch.options.nowWeek; if(w == null || w < 43 || w > 70) return;
+  const x = ch.scales.x.getPixelForValue(w), a = ch.chartArea, c = ch.ctx;
+  c.save(); c.setLineDash([5,4]); c.strokeStyle = "#b3261e"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x,a.top); c.lineTo(x,a.bottom); c.stroke();
+  c.setLineDash([]); c.fillStyle = "#b3261e"; c.font = "bold " + (ch.$fs||11) + "px Arial"; c.textAlign = "center"; c.fillText("Now: wk " + w, x, a.top - 4); c.restore();
+}};
+function stdConfig(pdf){
+  const fs = pdf ? 17 : 11;
+  return { type:"line", plugins:[valueLabels, whiteBg],
+    data:{ labels: STD.map(s=>[s.wk+"wks", s.lab]), datasets:[
+      { label:"%Hatch", data:STD.map(s=>s.hatch), yAxisID:"y", borderColor:"#aed9dc", backgroundColor:"#aed9dc", borderWidth:pdf?8:5, pointRadius:0, tension:0,
+        vl:{ fmt:v=>v+"%", color:"#000", dy:pdf?-14:-9 } },
+      { label:"DOC", data:STD.map(s=>s.doc), yAxisID:"y2", borderColor:"#ff0000", backgroundColor:"#ff0000", borderWidth:pdf?6:3, pointRadius:0, tension:0,
+        vl:{ fmt:v=>String(v), color:"#000", dy:pdf?26:17 } } ] },
+    options:{ responsive:!pdf, animation:false, maintainAspectRatio:false, layout:{ padding:{ top:14, right:pdf?10:4 } },
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ min:0, max:90, ticks:{ stepSize:10, callback:v=>v+"%", font:{ size:fs, weight:"bold" } } },
+               y2:{ position:"right", min:0, max:12000, grid:{ drawOnChartArea:false }, ticks:{ stepSize:2000, font:{ size:fs, weight:"bold" } } },
+               x:{ ticks:{ font:{ size:fs } }, grid:{ display:false } } } } };
+}
+function actConfig(by, pdf){
+  const fs = pdf ? 16 : 11, cw = weekFor(todayISO());
+  const stdPts = []; for(let w=43; w<=70; w++) stdPts.push({ x:w, y:stdAt(w) });
+  const actPts = Object.keys(by).map(Number).sort((a,b)=>a-b).map(w=>({ x:w, y:Math.round(by[w].avg*10)/10 }));
+  return { type:"line", plugins:[valueLabels, nowLine, whiteBg],
+    data:{ datasets:[
+      { label:"Standard %Hatch", data:stdPts, borderColor:"#7fbfc4", backgroundColor:"#7fbfc4", borderWidth:pdf?7:4, tension:0,
+        pointRadius:c=>STDW.indexOf(c.raw.x) >= 0 ? (pdf?6:4) : 0,
+        vl:{ fmt:v=>Math.round(v)+"%", color:"#2a6f74", dy:pdf?30:19, only:raw=>STDW.indexOf(raw.x) >= 0 } },
+      { label:"Actual weekly average", data:actPts, borderColor:"#b3261e", backgroundColor:"#b3261e", borderWidth:pdf?5:3, tension:0, pointRadius:pdf?7:5, spanGaps:true,
+        vl:{ fmt:v=>r1(v)+"%", color:"#b3261e", dy:pdf?-14:-9 } } ] },
+    options:{ responsive:!pdf, animation:false, maintainAspectRatio:false, nowWeek:cw, layout:{ padding:{ top:18, right:pdf?10:6 } },
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ min:0, max:100, ticks:{ stepSize:10, callback:v=>v+"%", font:{ size:fs, weight:"bold" } } },
+               x:{ type:"linear", min:43, max:70, ticks:{ stepSize:pdf?3:1, font:{ size:pdf?15:9 }, callback:v=>v+(pdf?"wks":"") }, title:{ display:true, text:"Flock age (weeks)", font:{ size:fs } } } } } };
+}
+let cStd, cAct, cHen, cChicks;
+function drawCharts(by){
+  if(cStd) cStd.destroy(); if(cAct) cAct.destroy();
+  cStd = new Chart(document.getElementById("chartStd"), stdConfig(false));
+  cAct = new Chart(document.getElementById("chartAct"), actConfig(by, false));
+  if(!cHen){
+    cHen = new Chart(document.getElementById("chartHen"), { type:"bar", plugins:[valueLabels],
+      data:{ labels:STD.map(s=>[s.wk+"wks", s.lab]), datasets:[{ data:STD.map(s=>s.hen), backgroundColor:"#333399", borderColor:"#ff0000", borderWidth:1.5, vl:{ fmt:v=>v+"%", dy:-6 } }] },
+      options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:16 } }, plugins:{ legend:{ display:false } }, scales:{ y:{ min:0, max:100, ticks:{ stepSize:10, callback:v=>v+"%" } }, x:{ grid:{ display:false } } } } });
+    cChicks = new Chart(document.getElementById("chartChicks"), { type:"line", plugins:[valueLabels],
+      data:{ labels:CHICKS.map(c=>c[0]), datasets:[{ data:CHICKS.map(c=>c[1]), borderColor:"#ff0000", backgroundColor:"#ff0000", borderWidth:3, pointRadius:0, tension:0, vl:{ fmt:v=>String(v), dy:-8, dx:12 } }] },
+      options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:16, right:20 } }, plugins:{ legend:{ display:false } }, scales:{ y:{ min:0, max:10000, ticks:{ stepSize:1000 } }, x:{ grid:{ display:false } } } } });
+  }
+}
+
+// ====== Numbers and page ======
+function summary(by){
+  const cw = weekFor(todayISO()), weeks = Object.keys(by).map(Number).sort((a,b)=>a-b);
+  const cur = by[cw], std = stdAt(cw);
+  const prevW = weeks.filter(w=>w<cw).pop();
+  const prev = prevW != null ? by[prevW] : null;
+  return { cw:cw, cur:cur, std:std, weeks:weeks, prev:prev, prevW:prevW };
+}
+function statusText(avg, std){
+  const d = avg - std;
+  if(Math.abs(d) < 0.05) return { t:"On the standard", c:"good" };
+  return d > 0 ? { t:"Above standard by "+r1(d)+" pts", c:"good" } : { t:"Below standard by "+r1(-d)+" pts", c:"bad" };
+}
+function render(){
+  const by = gatherWeeks(), S = summary(by);
+  document.getElementById("sample-note").style.display = SAMPLE ? "block" : "none";
+  document.getElementById("btn-sample").textContent = SAMPLE ? "Show my real records" : "Preview with sample data";
+  const k = [];
+  k.push(['<span class="red">'+S.cw+'</span>', "Age (Weeks) now"]);
+  k.push([Math.round(S.std)+"%", "Standard %Hatch this week"]);
+  if(S.cur){
+    const st = statusText(S.cur.avg, S.std);
+    k.push(['<span class="red">'+r1(S.cur.avg)+"%</span>", "Actual average so far ("+S.cur.days.length+" day"+(S.cur.days.length===1?"":"s")+")"]);
+    k.push(['<span class="'+st.c+'" style="font-size:14px;">'+st.t+"</span>", "Against the standard"]);
+  } else {
+    k.push(["—", "Actual this week: no hatchery record yet"]);
+  }
+  if(S.prev && S.cur){ const diff = S.cur.avg - S.prev.avg; k.push([(diff>=0?"▲ ":"▼ ")+r1(Math.abs(diff))+" pts", "Change from week "+S.prevW]); }
+  document.getElementById("kpis").innerHTML = k.map(x=>'<div class="kpi"><b>'+x[0]+"</b><span>"+x[1]+"</span></div>").join("");
+  // table
+  const wset = S.weeks.slice(); if(wset.indexOf(S.cw) < 0) wset.push(S.cw); wset.sort((a,b)=>a-b);
+  let h = "<tr><th>Age (Weeks)</th><th>Days</th><th>Actual avg %</th><th>Standard %</th><th>Difference</th><th>Status</th></tr>";
+  wset.forEach(w=>{
+    const b = by[w], sd = stdAt(w);
+    if(b){ const st = statusText(b.avg, sd), df = b.avg - sd;
+      h += "<tr><td><b>"+w+"</b></td><td>"+b.days.length+'</td><td class="red"><b>'+r1(b.avg)+"%</b></td><td>"+r1(sd)+"%</td><td>"+(df>=0?"+":"")+r1(df)+'</td><td class="'+st.c+'">'+st.t+"</td></tr>";
+    } else h += "<tr><td><b>"+w+"</b></td><td>0</td><td>—</td><td>"+r1(sd)+"%</td><td>—</td><td>No record yet</td></tr>";
+  });
+  document.getElementById("wk-table").innerHTML = h;
+  document.getElementById("day-list").innerHTML = S.weeks.length ? S.weeks.slice().reverse().map(w=>"<p style='margin:6px 0;'><b>Week "+w+":</b> "+by[w].days.map(d=>niceDate(d.date)+" "+r1(d.pct)+"%").join(" · ")+"</p>").join("") : '<div class="nodata">No hatchery records with Candling Fertile and Hatch Chicks yet.</div>';
+  drawCharts(by);
+  window._by = by; window._S = S;
+}
+window.cplAfterSync = function(){ render(); };
+function toggleSample(){ SAMPLE = !SAMPLE; render(); }
+async function syncNow(){
+  if(cplSyncCfg()){ await cplSyncAll(); } else { document.getElementById("sync-status").textContent = "Not connected to the cloud on this device (set it up on the Monthly Records page)."; }
+  render();
+}
+(function(){ const c = cplSyncCfg(); let st=null; try{ st = localStorage.getItem("cpl_sync_status"); }catch(e){}
+  document.getElementById("sync-status").textContent = c ? (st || "Cloud sync connected.") : "Showing records saved on this device."; })();
+render();
+
+// ====== PDF ======
+function offImage(cfg, w, h){
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.style.position="fixed"; cv.style.left="-9999px"; document.body.appendChild(cv);
+  cfg.options.devicePixelRatio = 1; const ch = new Chart(cv, cfg); ch.$fs = 17; ch.update("none");
+  const url = cv.toDataURL("image/png"); ch.destroy(); cv.remove(); return url;
+}
+function generatePDF(){
+  const by = window._by, S = window._S;
+  const { jsPDF } = window.jspdf, doc = new jsPDF({ unit:"pt", format:"a4" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), mL = 36, mR = 36, cw = W - mL - mR;
+  doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.setTextColor(43,65,39);
+  doc.text("HATCHERY TREND — ACTUAL AGAINST STANDARD", W/2, 36, { align:"center" });
+  doc.setFontSize(10); doc.setTextColor(0,0,0); doc.setFont("helvetica","normal");
+  doc.text("CPL Poultry Division — printed " + niceDate(todayISO()) + (SAMPLE ? " (SAMPLE DATA)" : ""), W/2, 50, { align:"center" });
+  doc.setFont("helvetica","bold"); doc.setTextColor(179,38,30);
+  let line = "Age (Weeks): " + S.cw + "     Standard %Hatch: " + Math.round(S.std) + "%";
+  if(S.cur) line += "     Actual so far: " + r1(S.cur.avg) + "%  (" + statusText(S.cur.avg, S.std).t + ")"; else line += "     Actual: no record yet this week";
+  doc.setFontSize(10); doc.text(line, mL, 70);
+  // chart 1
+  let y = 84;
+  doc.setTextColor(43,65,39); doc.setFontSize(11); doc.text("Standard — Weekly DOC Production Forecast (Revise PNG 2026-2027)", mL, y); y += 6;
+  const h1 = Math.round(cw*0.45);
+  doc.addImage(offImage(stdConfig(true), 1000, 450), "PNG", mL, y, cw, h1);
+  doc.setFillColor(13,110,253); doc.rect(mL+cw-150, y+6, 70, 14, "F"); doc.setTextColor(255,255,255); doc.setFontSize(9); doc.text("%Hatch", mL+cw-115, y+16, { align:"center" });
+  doc.setFillColor(255,0,0); doc.rect(mL+cw-75, y+6, 60, 14, "F"); doc.text("DOC", mL+cw-45, y+16, { align:"center" });
+  y += h1 + 14;
+  // chart 2
+  doc.setTextColor(43,65,39); doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.text("Actual weekly average fertile % against the standard", mL, y); y += 6;
+  doc.addImage(offImage(actConfig(by, true), 1000, 450), "PNG", mL, y, cw, h1);
+  y += h1 + 12;
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(60,60,50);
+  const note = "Light blue line = standard %Hatch. Red line = actual weekly average of the daily Fertile Percentage (Hatch Chicks ÷ Candling Fertile × 100) from the Hatchery Record. Dashed line = the week we are in now.";
+  doc.text(doc.splitTextToSize(note, cw), mL, y);
+  // page 2 table
+  doc.addPage();
+  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(43,65,39); doc.text("Week by week", mL, 40);
+  const wset = S.weeks.slice(); if(wset.indexOf(S.cw) < 0) wset.push(S.cw); wset.sort((a,b)=>a-b);
+  const body = wset.map(w=>{ const b = by[w], sd = stdAt(w);
+    return b ? [String(w), String(b.days.length), r1(b.avg)+"%", r1(sd)+"%", (b.avg-sd>=0?"+":"")+r1(b.avg-sd), statusText(b.avg, sd).t]
+             : [String(w), "0", "—", r1(sd)+"%", "—", "No record yet"]; });
+  doc.autoTable({ startY:50, margin:{ left:mL, right:mR }, theme:"grid",
+    styles:{ fontSize:9, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255] },
+    head:[["Age (Weeks)","Days counted","Actual average %","Standard %","Difference (pts)","Status"]], body:body,
+    columnStyles:{ 5:{ halign:"left" } }, rowPageBreak:"avoid",
+    didParseCell:function(d){ if(d.section==="body" && (d.column.index===0 || d.column.index===2)){ d.cell.styles.textColor=[179,38,30]; d.cell.styles.fontStyle="bold"; } } });
+  let y2 = doc.lastAutoTable.finalY + 16;
+  const foot = "Weekly average = all daily fertile percentages recorded in that week (from the first day of the week up to today) added up and divided by the number of days. A day with several batches counts as one day using the average of its batches.";
+  const lines = doc.splitTextToSize(foot, cw);
+  if(y2 + lines.length*11 > H - 40){ doc.addPage(); y2 = 50; }
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(60,60,50); doc.text(lines, mL, y2);
+  const nice = new Date().toLocaleDateString("en-GB").split("/").join(" ");
+  doc.save(nice + " Hatchery Trend.pdf");
+}
+</script>
+</body>
+</html>

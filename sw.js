@@ -1,7 +1,7 @@
 // CPL Poultry apps — lets the apps open with no internet after the first online visit.
 const CACHE = "cpl-apps-v2";
 const LOCAL = [
-  "./", "index.html", "daily-checklist.html", "feed-stock-calculator.html", "monthly-records.html", "hatchery-report.html"
+  "./", "index.html", "daily-checklist.html", "feed-stock-calculator.html", "monthly-records.html", "hatchery-report.html", "hatch-trend.html"
 ];
 const CDN = [
   "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
