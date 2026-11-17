@@ -231,7 +231,7 @@ function aggregate(date, rec){
     (c.vacc||[]).forEach(v=>{ const m=n(v.mortality); if(m===null) return; anyM=true; if(v.gender==="Male") mM+=m; else if(v.gender==="Female") mF+=m; else mU+=m; });
     d.mortM = anyM?mM:null; d.mortF = anyM?mF:null; d.mortU = anyM?mU:null; d.mortT = anyM?mM+mF+mU:null;
     const fm=[],ff=[],ft=[],wa=[],wp=[],wc=[];
-    (c.feed||[]).forEach(f=>{ fm.push(n(f.male)); ff.push(n(f.female)); ft.push(n(f.total)); wa.push(n(f.waterAM)); wp.push(n(f.waterPM)); wc.push(n(f.consumption)); });
+    (c.feed||[]).forEach(f=>{ const cm=n(f.curMale), cf=n(f.curFemale), ct=n(f.curTotal), useCur=(cm!==null||cf!==null||ct!==null); fm.push(useCur?cm:n(f.male)); ff.push(useCur?cf:n(f.female)); ft.push(useCur?(ct!==null?ct:(cm||0)+(cf||0)):n(f.total)); wa.push(n(f.waterAM)); wp.push(n(f.waterPM)); wc.push(n(f.consumption)); });
     d.feedM=sum(fm); d.feedF=sum(ff); d.feedT=sum(ft); if(d.feedT===null && (d.feedM!==null||d.feedF!==null)) d.feedT=(d.feedM||0)+(d.feedF||0);
     d.waterAM=sum(wa); d.waterPM=sum(wp); d.water=sum(wc);
     const hAMt=[],hPMt=[],hAMh=[],hPMh=[];
