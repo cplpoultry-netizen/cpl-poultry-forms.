@@ -279,6 +279,18 @@
     color:var(--green-dark);
     white-space:nowrap;
   }
+  .unit-field .f-read{
+    font-size:10px;
+    font-weight:700;
+    color:#a05a00;
+    white-space:nowrap;
+  }
+  /* Celsius and Fahrenheit readings in red */
+  [data-house-temp], [data-fcol]{
+    color:#b3261e !important;
+    font-weight:800 !important;
+  }
+  [data-fcol]{ background:#f0efe8 !important; min-width:44px; }
   .egg-multi{ min-width:100px; }
   .egg-readings{
     display:flex;
@@ -446,7 +458,7 @@
     <div class="scroll-x">
       <table class="grid" id="house-table">
         <thead>
-          <tr><th>House</th><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>Status</th><th>Remarks</th></tr>
+          <tr><th>House</th><th>Time</th><th>Temp (°C)</th><th>Temp (°F)</th><th>Humidity (%)</th><th>Status</th><th>Remarks</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -866,6 +878,12 @@ function addHouseRow(){
     </td>
     <td>
       <div class="unit-field">
+        <input type="text" readonly tabindex="-1" data-fcol data-fsrc='[data-house-temp="${i}"][data-slot="am"]' placeholder="—">
+        <span class="unit-suffix">°F</span>
+      </div>
+    </td>
+    <td>
+      <div class="unit-field">
         <input type="number" step="0.1" data-house-hum="${i}" data-slot="am">
         <span class="unit-suffix">%</span>
       </div>
@@ -888,6 +906,12 @@ function addHouseRow(){
       <div class="unit-field">
         <input type="number" step="0.1" data-house-temp="${i}" data-slot="pm" oninput="updateHouseStatus(${i},'pm')">
         <span class="unit-suffix">°C</span>
+      </div>
+    </td>
+    <td>
+      <div class="unit-field">
+        <input type="text" readonly tabindex="-1" data-fcol data-fsrc='[data-house-temp="${i}"][data-slot="pm"]' placeholder="—">
+        <span class="unit-suffix">°F</span>
       </div>
     </td>
     <td>
@@ -1341,6 +1365,25 @@ function scanCancel(keepMsg){
   _scanItems = [];
 }
 
+// ---- Fahrenheit in its own column beside every Celsius reading ----
+function cToF(v){
+  const c = parseFloat(v);
+  return isNaN(c) ? "" : (Math.round((c * 9 / 5 + 32) * 10) / 10).toFixed(1);
+}
+function fOnly(v){ return cToF(v); }   // for the PDF Fahrenheit columns
+function refreshFahrenheit(){
+  document.querySelectorAll("[data-fcol]").forEach(out=>{
+    const src = document.querySelector(out.getAttribute("data-fsrc"));
+    const f = src ? cToF(src.value) : "";
+    if(out.value !== f) out.value = f;
+  });
+}
+document.addEventListener("input", refreshFahrenheit);
+document.addEventListener("change", refreshFahrenheit);
+new MutationObserver(refreshFahrenheit).observe(document.body, { childList:true, subtree:true });
+setInterval(refreshFahrenheit, 600);   // also catches values filled in by loading a saved day, Clear or Scan
+refreshFahrenheit();
+
 // ---- Autosave this form into the records database (one record per date) ----
 function cplFieldKey(el, seen){
   let k = el.id ? "#"+el.id : el.tagName + ":" + el.getAttributeNames().filter(n=>n.startsWith("data-")).sort().map(n=>n+"="+el.getAttribute(n)).join("|");
@@ -1348,7 +1391,7 @@ function cplFieldKey(el, seen){
   return k + "~" + seen[k];
 }
 function cplSkipField(el){
-  return el.type === "file" || (el.id && el.id.indexOf("ration-") === 0) || el.id === "f-date" || el.id === "stock-rem-M" || el.id === "stock-rem-F" || el.id === "stock-total";
+  return el.hasAttribute("data-fcol") || el.type === "file" || (el.id && el.id.indexOf("ration-") === 0) || el.id === "f-date" || el.id === "stock-rem-M" || el.id === "stock-rem-F" || el.id === "stock-total";
 }
 function cplSnapshotFields(){
   const seen = {}, out = {};
@@ -1710,9 +1753,15 @@ function generatePDF(){
     margin:{left:marginL,right:marginL},
     styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
     headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
-    head:[["House No","Time","Temp (°C)","Humidity (%)","Status","Remarks"]],
-    body: d.house.map(r=>[r.house, r.time, r.temp, r.hum, r.ok, r.remarks]),
-    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 5:{halign:"left"}},
+    head:[["House No","Time","Temp (°C)","Temp (°F)","Humidity (%)","Status","Remarks"]],
+    body: d.house.map(r=>[r.house, r.time, r.temp, fOnly(r.temp), r.hum, r.ok, r.remarks]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 6:{halign:"left"}},
+    didParseCell: function(data){
+      if(data.section === "body" && (data.column.index === 2 || data.column.index === 3)){
+        data.cell.styles.textColor = [179,38,30];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
   });
   y = doc.lastAutoTable.finalY + 12;
 
