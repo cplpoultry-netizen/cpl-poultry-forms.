@@ -89,7 +89,8 @@
     <p class="hint" style="margin-top:0;">Connect once on each phone or computer. After that, every record you save is also sent to a Google Sheet in your own Drive, and every device shows the same records. It still works with no internet and catches up later.</p>
     <p class="hint"><b>Status:</b> <span id="sync-status">Not connected on this device.</span></p>
     <div id="share-connected" style="display:none;">
-      <div class="btns"><button class="primary" onclick="syncNowClick()">Sync now</button><button class="danger" onclick="disconnectSync()">Disconnect this device</button></div>
+      <div class="btns"><button class="primary" onclick="syncNowClick()">Sync now</button><button onclick="diagnoseSync()">Check cloud</button><button class="danger" onclick="disconnectSync()">Disconnect this device</button></div>
+      <pre id="sync-diag" style="display:none;white-space:pre-wrap;font-size:12.5px;background:#fbfaf5;border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;"></pre>
     </div>
     <details id="share-setup" style="margin-top:10px;">
       <summary style="cursor:pointer;font-weight:600;color:var(--green-dark);">Set-up steps (first time)</summary>
@@ -855,6 +856,44 @@ function disconnectSync(){
   if(!confirm("Disconnect this device from the cloud? Records already on this device stay.")) return;
   try{ localStorage.removeItem(CPL_SYNC_KEY); localStorage.removeItem("cpl_sync_status"); }catch(e){}
   showSyncState();
+}
+
+async function diagnoseSync(){
+  const box = document.getElementById("sync-diag"); box.style.display = "block";
+  const c = cplSyncCfg(); if(!c){ box.textContent = "Not connected on this device."; return; }
+  box.textContent = "Checking the cloud…";
+  try{
+    const r = await fetch(c.url + (c.url.indexOf("?")>=0 ? "&" : "?") + "key=" + encodeURIComponent(c.key));
+    const txt = await r.text(); let j; try{ j = JSON.parse(txt); }catch(e){ box.textContent = "The cloud did not answer properly (it sent a web page, not data).\nThis usually means the script's Share setting is not 'Anyone', or the URL is wrong.\nURL ends with: ..." + c.url.slice(-14); return; }
+    if(j.error){ box.textContent = "The cloud says: " + j.error; return; }
+    const items = j.items||[], db = cplDbLoad(); let local = 0;
+    const cloud = {}; items.forEach(it=>{ cloud[it.date+"|"+it.section] = it.updated||""; });
+    let onlyCloud=0, onlyLocal=0, cloudNewer=0, localNewer=0, same=0, newestC="", newestL="";
+    items.forEach(it=>{ if((it.updated||"")>newestC) newestC = it.updated||""; });
+    Object.keys(db.records).forEach(d=>Object.keys(db.records[d]).forEach(sec=>{
+      local++; const u = db.records[d][sec].updated||""; if(u>newestL) newestL = u;
+      const cu = cloud[d+"|"+sec];
+      if(cu===undefined) onlyLocal++; else if(cu>u) cloudNewer++; else if(cu<u) localNewer++; else same++; }));
+    Object.keys(cloud).forEach(k=>{ const a=k.split("|"); if(!(db.records[a[0]] && db.records[a[0]][a[1]])) onlyCloud++; });
+    const dates = Array.from(new Set(items.map(i=>i.date))).sort();
+    let msg = "CLOUD CHECK\n"+
+      "Web app URL ends with: ..."+c.url.slice(-14)+"\n"+
+      "Passphrase: "+c.key.length+" characters, starts '"+c.key.charAt(0)+"' ends '"+c.key.slice(-1)+"'\n"+
+      "This phone's clock: "+new Date().toISOString().replace("T"," ").slice(0,16)+" (UTC)\n\n"+
+      "Records in the cloud: "+items.length+(dates.length?"  (dates "+dates[0]+" to "+dates[dates.length-1]+")":"")+"\n"+
+      "Records on this phone: "+local+"\n"+
+      "In cloud but not on this phone: "+onlyCloud+"\n"+
+      "On this phone but not in cloud: "+onlyLocal+"\n"+
+      "Same on both: "+same+"\n"+
+      "Cloud copy newer: "+cloudNewer+"   This phone newer: "+localNewer+"\n"+
+      "Newest save in cloud: "+(newestC||"none")+"\nNewest save on this phone: "+(newestL||"none")+"\n\n";
+    if(items.length===0) msg += "MEANING: the cloud is EMPTY. Nothing has been uploaded to this URL yet.";
+    else if(onlyCloud>0) msg += "MEANING: the cloud has "+onlyCloud+" records this phone does not have. Tap Sync now to bring them in.";
+    else if(onlyLocal>0) msg += "MEANING: this phone has "+onlyLocal+" records the cloud does not have. Tap Sync now to send them.";
+    else if(localNewer>0 && newestL>newestC) msg += "MEANING: this phone's saves are newer than the cloud's. If the clock above is wrong, fix the phone's date and time.";
+    else msg += "MEANING: this phone and the cloud match. Everything is up to date.";
+    box.textContent = msg;
+  }catch(e){ box.textContent = "Could not reach the cloud: "+(e&&e.message?e.message:"check the internet and the URL"); }
 }
 window.cplAfterSync = function(){ try{ refresh(); showSyncState(); }catch(e){} };
 
