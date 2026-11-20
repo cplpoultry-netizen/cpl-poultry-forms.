@@ -345,6 +345,7 @@ function summarize(days){
   S.tempAM=avg(days.map(d=>d.hTempAM===undefined?null:d.hTempAM)); S.tempPM=avg(days.map(d=>d.hTempPM===undefined?null:d.hTempPM));
   let last=null; days.forEach(d=>{ if(d.remM!==null && d.remM!==undefined || d.remF!==null && d.remF!==undefined) last=d; });
   S.remM = last?last.remM:null; S.remF = last?last.remF:null; S.remT = last?last.remT:null;
+  if(last && (S.remT===null||S.remT===undefined) && (S.remM!==null||S.remF!==null)) S.remT = (S.remM||0)+(S.remF||0);   // work out the total if it was not saved
   return S;
 }
 
@@ -589,7 +590,7 @@ function kpiPairs(S){
     [S.count,"Days recorded"], [fmt(S.eggs),"Total eggs"], [fmt(S.avgEggs),"Average eggs per day"],
     [fmt(S.hatch)+(S.hatchPct!==null?" ("+fmt(S.hatchPct)+"%)":""),"Hatchery eggs"], [fmt(S.table),"Table eggs"], [fmt(S.smash),"Smash eggs"],
     [fmt(S.mortT),"Total mortality"], [fmt(S.mortM)+" M / "+fmt(S.mortF)+" F","Male / Female mortality"],
-    [fmt(S.remT),"Birds remaining (latest)"], [fmt(S.feed),"Feed given (kg)"], [fmt(S.water),"Water (litres)"], [fmt(S.stockKg),"Feed stock recorded (kg)"],
+    [fmt(S.remT),"Total birds remaining (Male + Female)"], [fmt(S.remM),"Male birds remaining (latest)"], [fmt(S.remF),"Female birds remaining (latest)"], [fmt(S.feed),"Feed given (kg)"], [fmt(S.water),"Water (litres)"], [fmt(S.stockKg),"Feed stock recorded (kg)"],
     [fmt(S.storeSum),"Storage eggs — all days added up"], [fmt(S.curSum),"Current storage — all days added up"],
     [fmt(S.hBatches),"Hatchery batches"], [fmt(S.hSet),"Eggs set"], [fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"], [fmt(S.hSalable),"Salable chicks"],
     [fmt(S.sgTotal),"Segregated eggs"], [fmt(S.sgClean)+(S.sgPct!==null?" ("+fmt(S.sgPct)+"%)":""),"Clean eggs (segregation)"],
