@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Segregation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{ --ink:#1f2a1f; --paper:#f7f5ef; --green:#3f5d3a; --green-dark:#2b4127; --amber:#c98a2c; --red:#b3261e; --line:#d8d3c4; --card:#fff; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; padding-bottom:84px; }
+  header{ background:var(--green-dark); color:#fff; padding:16px 16px 14px; text-align:center; border-bottom:4px solid var(--amber); }
+  header h1{ margin:0; font-size:20px; } header p{ margin:3px 0 0; font-size:12.5px; opacity:.85; }
+  .wrap{ max-width:900px; margin:0 auto; padding:12px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .card h2{ margin:0 0 8px; font-size:15px; color:var(--green-dark); }
+  .hint{ font-size:11.5px; color:#6b6b5e; margin:6px 0 0; }
+  .daterow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .daterow input[type=date]{ flex:1; min-width:150px; font-size:16px; padding:9px; border:1px solid var(--line); border-radius:8px; }
+  .btn{ border:0; border-radius:8px; padding:10px 14px; font-size:14px; font-weight:700; cursor:pointer; }
+  .btn-primary{ background:var(--green-dark); color:#fff; } .btn-secondary{ background:#e9e5d6; color:var(--ink); } .btn-danger{ background:#fff; color:var(--red); border:1px solid var(--red); }
+  .scroll-x{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table{ border-collapse:collapse; width:100%; min-width:560px; font-size:13px; }
+  th,td{ border:1px solid var(--line); padding:4px; text-align:center; }
+  th{ background:var(--green-dark); color:#fff; font-size:11.5px; line-height:1.15; padding:7px 3px; }
+  td.time{ font-weight:700; background:#f3f0e4; white-space:nowrap; padding:4px 6px; position:sticky; left:0; }
+  td input{ width:100%; min-width:46px; font-size:16px; padding:8px 2px; text-align:center; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  td input:focus{ outline:2px solid var(--amber); }
+  tr.totalbar td{ background:#f6b26b; font-weight:800; font-size:15px; border-color:#d98e3a; }
+  tr.totalbar td.time{ background:#f6b26b; }
+  .chk{ font-size:12px; font-weight:700; }
+  .chk.ok{ color:#2a7a2a; } .chk.off{ color:#b36b00; }
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
+  .kpi{ border:1px solid var(--line); border-radius:8px; padding:8px; text-align:center; background:#fbfaf5; }
+  .kpi b{ display:block; font-size:19px; } .kpi span{ font-size:11px; color:#6b6b5e; }
+  #status{ font-size:12px; color:#6b6b5e; margin-top:8px; }
+  footer.bar{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); padding:10px; display:flex; gap:8px; justify-content:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Segregation</h1>
+  <p>CPL Poultry Division — egg segregation count for the day</p>
+  <p id="sync-status" style="font-size:12px;"></p>
+</header>
+<div class="wrap">
+
+  <div class="card">
+    <h2>Date</h2>
+    <div class="daterow">
+      <button class="btn btn-secondary" onclick="shiftDay(-1)" aria-label="Previous day">◀</button>
+      <input type="date" id="f-date">
+      <button class="btn btn-secondary" onclick="shiftDay(1)" aria-label="Next day">▶</button>
+      <button class="btn btn-secondary" onclick="goToday()">Today</button>
+    </div>
+    <div id="status">Pick a date. Everything you type is saved automatically.</div>
+  </div>
+
+  <div class="card">
+    <h2>Egg counts — 9:00 AM, 12:00 PM and 4:00 PM</h2>
+    <div class="scroll-x">
+      <table id="seg-table">
+        <thead><tr>
+          <th>Time</th><th>Total</th><th>Minor<br>Crack</th><th>Smash</th><th>Small</th><th>Miss<br>Shape</th><th>Thin<br>Shell</th><th>Dirty</th><th>Clean</th><th>Check</th>
+        </tr></thead>
+        <tbody id="seg-body"></tbody>
+      </table>
+    </div>
+    <p class="hint">Type the figures for each time. The orange TOTAL bar adds up every column by itself. "Check" shows ✓ when the Minor Crack to Clean columns add up to that row's Total; otherwise it shows how many eggs are different, so you can spot a typing mistake.</p>
+  </div>
+
+  <div class="card">
+    <h2>Day summary</h2>
+    <div class="kpis" id="kpis"></div>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <button class="btn btn-danger" onclick="clearDay()">Clear this day</button>
+  </div>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<script>
+// ====== Records database + cloud sync (same one the other CPL apps use) ======
+const CPL_DB_KEY = "cpl_records_v1";
+let _cplDbWarned = false;
+function cplDbLoad(){
+  try{
+    const r = JSON.parse(localStorage.getItem(CPL_DB_KEY));
+    if(r && r.records) return r;
+  }catch(e){}
+  return { version:1, records:{} };
+}
+function cplDbGet(date, section){
+  const db = cplDbLoad();
+  const x = db.records[date] && db.records[date][section];
+  return (x && !x.deleted) ? x : null;
+}
+function cplDbPut(date, section, payload){
+  try{
+    const db = cplDbLoad();
+    if(!db.records[date]) db.records[date] = {};
+    payload.updated = new Date().toISOString();
+    db.records[date][section] = payload;
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    try{ cplSyncPush([{ date:date, section:section, updated:payload.updated, payload:payload }]); }catch(e){}
+    return true;
+  }catch(e){
+    if(!_cplDbWarned){
+      _cplDbWarned = true;
+      alert("Could not save to the records database (storage full or blocked). Open the Monthly Records page and download a backup.");
+    }
+    return false;
+  }
+}
+function cplStatus(msg, ok){
+  const el = document.getElementById("rec-status");
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok === false ? "#ffb4ab" : "#cfe6c8";
+}
+// ---------- Cloud sync between devices (Google Sheet + Apps Script) ----------
+// Only active after you connect it on the Monthly Records page. Records still save on this device first.
+const CPL_SYNC_KEY = "cpl_sync_cfg";
+function cplSyncCfg(){
+  try{ const c = JSON.parse(localStorage.getItem(CPL_SYNC_KEY)); if(c && c.url && c.key) return c; }catch(e){}
+  return null;
+}
+function cplSyncSetStatus(m){
+  try{ localStorage.setItem("cpl_sync_status", m); }catch(e){}
+  const el = document.getElementById("sync-status"); if(el) el.textContent = m;
+}
+async function cplSyncPost(items){
+  const c = cplSyncCfg();
+  const r = await fetch(c.url, { method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({ key:c.key, items:items }) });
+  const j = await r.json();
+  if(j.error) throw new Error(j.error);
+  return j;
+}
+let _syncQueue = [], _syncTimer = null;
+function cplSyncPush(items){
+  if(!cplSyncCfg()) return;
+  _syncQueue = _syncQueue.concat(items);
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(cplSyncFlush, 2500);
+}
+async function cplSyncFlush(){
+  const map = {}; _syncQueue.forEach(it=>{ map[it.date+"|"+it.section] = it; }); _syncQueue = [];
+  const items = Object.values(map);
+  if(!items.length || !cplSyncCfg()) return;
+  try{
+    if(!navigator.onLine) throw new Error("offline");
+    await cplSyncPost(items);
+    cplSyncSetStatus("Synced to the cloud — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+  }catch(e){ cplSyncSetStatus("Saved on this device — will sync when online"); }
+}
+function cplNormDate(d){
+  d = String(d);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const m = d.match(/^\w{3} (\w{3}) (\d{1,2}) (\d{4})/);
+  if(m){ const mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(m[1]);
+    if(mo >= 0) return m[3] + "-" + String(mo+1).padStart(2,"0") + "-" + String(m[2]).padStart(2,"0"); }
+  return d;
+}
+function cplNormStamp(u){
+  u = String(u||"");
+  if(/^\d{4}-\d{2}-\d{2}T/.test(u)) return u;
+  const t = Date.parse(u); return isNaN(t) ? u : new Date(t).toISOString();
+}
+// The cloud sheet can turn dates into long date text. Read them back as normal dates, using the save time kept inside each record.
+function cplNormItem(it){
+  return { date:cplNormDate(it.date), section:it.section, payload:it.payload,
+           updated:(it.payload && it.payload.updated) ? String(it.payload.updated) : cplNormStamp(it.updated) };
+}
+// Clean up records that were saved under a long date text by an earlier sync.
+function cplDbRepair(db){
+  Object.keys(db.records).forEach(k=>{
+    if(/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+    const nk = cplNormDate(k); if(!/^\d{4}-\d{2}-\d{2}$/.test(nk)) return;
+    const src = db.records[k]; db.records[nk] = db.records[nk] || {};
+    Object.keys(src).forEach(sec=>{
+      const cur = db.records[nk][sec];
+      if(!cur || (src[sec].updated||"") > (cur.updated||"")) db.records[nk][sec] = src[sec];
+    });
+    delete db.records[k];
+  });
+  return db;
+}
+async function cplSyncAll(){
+  const c = cplSyncCfg(); if(!c) return null;
+  if(!navigator.onLine){ cplSyncSetStatus("Offline — will sync when online"); return null; }
+  try{
+    cplSyncSetStatus("Syncing…");
+    const r = await fetch(c.url + (c.url.indexOf("?")>=0 ? "&" : "?") + "key=" + encodeURIComponent(c.key));
+    const j = await r.json();
+    if(j.error) throw new Error(j.error);
+    const db = cplDbRepair(cplDbLoad()), remote = {}; let pulled = 0;
+    (j.items||[]).map(cplNormItem).forEach(it=>{
+      remote[it.date+"|"+it.section] = it.updated || "";
+      const cur = db.records[it.date] && db.records[it.date][it.section];
+      if(!cur || (it.updated||"") > (cur.updated||"")){
+        if(!db.records[it.date]) db.records[it.date] = {};
+        db.records[it.date][it.section] = it.payload; pulled++;
+      }
+    });
+    localStorage.setItem(CPL_DB_KEY, JSON.stringify(db));
+    const push = [];
+    Object.keys(db.records).forEach(d=>Object.keys(db.records[d]).forEach(s=>{
+      const p = db.records[d][s], ru = remote[d+"|"+s];
+      if(ru === undefined || (p.updated||"") > ru) push.push({ date:d, section:s, updated:p.updated, payload:p });
+    }));
+    for(let i=0;i<push.length;i+=15) await cplSyncPost(push.slice(i,i+15));
+    cplSyncSetStatus("Synced — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " (received " + pulled + ", sent " + push.length + ")");
+    if(typeof window.cplAfterSync === "function") window.cplAfterSync();
+    return { pulled:pulled, pushed:push.length };
+  }catch(e){
+    cplSyncSetStatus("Sync problem: " + (e && e.message ? e.message : "check internet and the Share setup"));
+    return null;
+  }
+}
+window.addEventListener("load", ()=>{ if(cplSyncCfg()) setTimeout(cplSyncAll, 1500); });
+window.addEventListener("online", ()=>{ if(cplSyncCfg()) cplSyncAll(); });
+
+// ====== Segregation ======
+const SLOTS = ["9:00 AM", "12:00 PM", "4:00 PM"];
+const COLS = [["total","Total"],["minor","Minor Crack"],["smash","Smash"],["small","Small"],["miss","Miss Shape"],["thin","Thin Shell"],["dirty","Dirty"],["clean","Clean"]];
+const SECTION = "segregation";
+let _loading = false, _timer = null, _lastTyped = 0, _shown = "";   // _shown = the date whose figures are on the screen now
+
+(function build(){
+  const tb = document.getElementById("seg-body");
+  SLOTS.forEach((t,r)=>{
+    const tr = document.createElement("tr");
+    let h = '<td class="time">' + t + "</td>";
+    COLS.forEach(c=>{ h += '<td><input type="number" inputmode="numeric" min="0" step="1" id="s' + r + "_" + c[0] + '" data-r="' + r + '" data-k="' + c[0] + '"></td>'; });
+    h += '<td class="chk" id="chk' + r + '"></td>';
+    tr.innerHTML = h; tb.appendChild(tr);
+  });
+  const tot = document.createElement("tr"); tot.className = "totalbar";
+  let h = '<td class="time">TOTAL</td>';
+  COLS.forEach(c=>{ h += '<td id="t_' + c[0] + '">—</td>'; });
+  h += "<td></td>"; tot.innerHTML = h; tb.appendChild(tot);
+})();
+
+function num(v){ const x = parseFloat(v); return isNaN(x) ? null : x; }
+function fmt(x){ return (x === null || x === undefined) ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits:1 }); }
+function readRows(){
+  return SLOTS.map((t,r)=>{ const o = { time:t }; COLS.forEach(c=>{ o[c[0]] = document.getElementById("s"+r+"_"+c[0]).value.trim(); }); return o; });
+}
+function columnTotals(rows){
+  const T = {}; COLS.forEach(c=>{ let s = 0, any = false; rows.forEach(r=>{ const v = num(r[c[0]]); if(v !== null){ s += v; any = true; } }); T[c[0]] = any ? s : null; });
+  return T;
+}
+function rowCheck(r){
+  const tot = num(r.total); if(tot === null) return null;
+  let s = 0; ["minor","smash","small","miss","thin","dirty","clean"].forEach(k=>{ s += (num(r[k]) || 0); });
+  return s - tot;
+}
+function recalc(){
+  const rows = readRows(), T = columnTotals(rows);
+  COLS.forEach(c=>{ document.getElementById("t_"+c[0]).textContent = fmt(T[c[0]]); });
+  rows.forEach((r,i)=>{
+    const d = rowCheck(r), el = document.getElementById("chk"+i);
+    if(d === null){ el.textContent = ""; el.className = "chk"; }
+    else if(d === 0){ el.textContent = "✓"; el.className = "chk ok"; }
+    else { el.textContent = (d > 0 ? "+" : "") + d; el.className = "chk off"; }
+  });
+  const k = [];
+  k.push([fmt(T.total), "Total eggs"]);
+  k.push([fmt(T.clean), "Clean eggs"]);
+  k.push([(T.total && T.clean !== null) ? (Math.round(T.clean / T.total * 1000) / 10) + "%" : "—", "Clean % of total"]);
+  let bad = 0, anyBad = false; ["minor","smash","small","miss","thin","dirty"].forEach(x=>{ if(T[x] !== null){ bad += T[x]; anyBad = true; } });
+  k.push([anyBad ? fmt(bad) : "—", "Not clean (all faults)"]);
+  document.getElementById("kpis").innerHTML = k.map(x=>"<div class='kpi'><b>" + x[0] + "</b><span>" + x[1] + "</span></div>").join("");
+  return { rows:rows, totals:T };
+}
+function hasData(rows){ return rows.some(r=>COLS.some(c=>r[c[0]] !== "")); }
+function setStatus(m){ document.getElementById("status").textContent = m; }
+
+function saveNow(){
+  const date = _shown; if(!date) return;
+  const R = recalc();
+  if(hasData(R.rows)){
+    const ok = cplDbPut(date, SECTION, { rows:R.rows, totals:R.totals });
+    setStatus(ok ? "Saved " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " ✓ (sent to the cloud if connected)" : "Could not save on this device.");
+  } else if(cplDbGet(date, SECTION)){
+    cplDbPut(date, SECTION, { deleted:true });
+    setStatus("This day is now empty, so its saved record was removed.");
+  }
+}
+function scheduleSave(){
+  if(_loading) return; _lastTyped = Date.now();
+  if(!document.getElementById("f-date").value){ setStatus("Pick a Date first, so this can be saved."); return; }
+  clearTimeout(_timer); _timer = setTimeout(()=>{ _timer = null; saveNow(); }, 400);
+}
+function loadDay(){
+  const date = document.getElementById("f-date").value; _loading = true; _shown = date;
+  document.querySelectorAll("#seg-body input").forEach(i=>{ i.value = ""; });
+  const rec = date ? cplDbGet(date, SECTION) : null;
+  if(rec && rec.rows){
+    rec.rows.forEach((row,r)=>{ if(r >= SLOTS.length) return; COLS.forEach(c=>{ const el = document.getElementById("s"+r+"_"+c[0]); if(el && row[c[0]] !== undefined) el.value = row[c[0]]; }); });
+    setStatus("Loaded the saved record for this date.");
+  } else if(date){ setStatus("No record for this date yet. Start typing and it saves by itself."); }
+  _loading = false; recalc();
+  try{ localStorage.setItem("cpl_seg_last_date", date); }catch(e){}
+}
+function todayISO(){ const t = new Date(); return t.getFullYear() + "-" + String(t.getMonth()+1).padStart(2,"0") + "-" + String(t.getDate()).padStart(2,"0"); }
+function goToday(){ document.getElementById("f-date").value = todayISO(); loadDay(); }
+function shiftDay(n){
+  const el = document.getElementById("f-date"); if(!el.value){ goToday(); return; }
+  saveNow();
+  const p = el.value.split("-").map(Number), d = new Date(p[0], p[1]-1, p[2]+n);
+  el.value = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); loadDay();
+}
+function clearDay(){
+  const date = _shown; if(!date){ alert("Pick a date first."); return; }
+  if(!confirm("Clear all segregation figures for this date?")) return;
+  document.querySelectorAll("#seg-body input").forEach(i=>{ i.value = ""; });
+  clearTimeout(_timer); recalc();
+  if(cplDbGet(date, SECTION)) cplDbPut(date, SECTION, { deleted:true });
+  setStatus("Cleared.");
+}
+document.getElementById("seg-body").addEventListener("input", ()=>{ recalc(); scheduleSave(); });
+document.getElementById("f-date").addEventListener("change", ()=>{ saveNow(); loadDay(); });
+window.addEventListener("pagehide", ()=>{ if(_timer){ clearTimeout(_timer); _timer = null; saveNow(); } });
+window.cplAfterSync = function(){ if(Date.now() - _lastTyped > 4000) loadDay(); };
+(function(){ const c = cplSyncCfg(); let st = null; try{ st = localStorage.getItem("cpl_sync_status"); }catch(e){}
+  document.getElementById("sync-status").textContent = c ? (st || "Cloud sync connected.") : "Saved on this device. Connect the cloud on the Monthly Records page to share between devices."; })();
+(function init(){ let d = null; try{ d = localStorage.getItem("cpl_seg_last_date"); }catch(e){}
+  document.getElementById("f-date").value = todayISO(); loadDay(); })();
+
+// ====== PDF ======
+function generatePDF(){
+  const date = document.getElementById("f-date").value;
+  if(!date){ alert("Pick a date first."); return; }
+  if(!window.jspdf || !window.jspdf.jsPDF){ alert("The PDF library did not load. Connect to the internet once, reload this page and try again."); return; }
+  const R = recalc();
+  if(!hasData(R.rows)){ alert("There are no figures to print for this date."); return; }
+  const { jsPDF } = window.jspdf, doc = new jsPDF({ unit:"pt", format:"a4" });
+  const W = doc.internal.pageSize.getWidth(), mL = 36, mR = 36, GREEN = [43,65,39];
+  const p = date.split("-"), nice = p[2] + " " + ["January","February","March","April","May","June","July","August","September","October","November","December"][+p[1]-1] + " " + p[0];
+  doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(...GREEN);
+  doc.text("EGG SEGREGATION RECORD", W/2, 44, { align:"center" });
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(0,0,0);
+  doc.text("CPL Poultry Division — Coconut Products Limited, Kokopo", W/2, 60, { align:"center" });
+  doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text("Date: " + nice, mL, 88);
+  const body = R.rows.map(r=>[r.time].concat(COLS.map(c=>r[c[0]] === "" ? "—" : r[c[0]])));
+  const foot = ["TOTAL"].concat(COLS.map(c=>fmt(R.totals[c[0]])));
+  doc.autoTable({ startY:98, margin:{ left:mL, right:mR }, theme:"grid",
+    head:[["Time","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Clean"]], body:body, foot:[foot], showFoot:"lastPage", rowPageBreak:"avoid",
+    styles:{ fontSize:11, cellPadding:7, halign:"center", valign:"middle", lineColor:[180,176,160], lineWidth:0.6 },
+    headStyles:{ fillColor:GREEN, textColor:255, fontStyle:"bold" },
+    footStyles:{ fillColor:[246,178,107], textColor:[20,20,20], fontStyle:"bold", fontSize:12 },
+    columnStyles:{ 0:{ halign:"left", fontStyle:"bold" } } });
+  let y = doc.lastAutoTable.finalY + 22;
+  const T = R.totals, lines = [];
+  if(T.total) lines.push("Total eggs segregated: " + fmt(T.total));
+  if(T.clean !== null && T.total) lines.push("Clean eggs: " + fmt(T.clean) + " (" + (Math.round(T.clean / T.total * 1000) / 10) + "% of total)");
+  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  lines.forEach(l=>{ doc.text(l, mL, y); y += 16; });
+  doc.setFontSize(8.5); doc.setTextColor(110,110,110);
+  doc.text("Printed " + new Date().toLocaleDateString("en-GB").split("/").join(" ") + " from the CPL Segregation app.", mL, doc.internal.pageSize.getHeight() - 28);
+  doc.save(p[2] + " " + p[1] + " " + p[0] + " Egg Segregation.pdf");
+}
+</script>
+</body>
+</html>
