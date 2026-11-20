@@ -67,6 +67,7 @@
         <tbody id="seg-body"></tbody>
       </table>
     </div>
+    <p class="hint"><b>Linked:</b> each time's Total is also put into the Daily Operation Checklist (9:00 AM, 12:00 PM, 4:00 PM and Total Eggs) and the Monthly Records for the same date.</p>
     <p class="hint">Type the figures for each time. The orange TOTAL bar adds up every column by itself. "Check" shows ✓ when the Minor Crack to Clean columns (including Extra Large) add up to that row's Total; otherwise it shows how many eggs are different, so you can spot a typing mistake.</p>
   </div>
 
@@ -281,11 +282,29 @@ function recalc(){
 function hasData(rows){ return rows.some(r=>COLS.some(c=>r[c[0]] !== "")); }
 function setStatus(m){ document.getElementById("status").textContent = m; }
 
+// Link: copy each time's Total into that date's Daily Operation Checklist record (9:00 AM, 12:00 PM, 4:00 PM, Total Eggs, Table Eggs).
+function linkToChecklist(date, rows){
+  try{
+    const cl = cplDbGet(date, "checklist"); if(!cl) return;   // no checklist saved for this date yet; it will pick the figures up when opened
+    const v = rows.map(r=>r.total === "" ? "" : String(num(r.total)));
+    let tot = 0, any = false; v.forEach(x=>{ if(x !== ""){ tot += Number(x); any = true; } });
+    const T = any ? String(tot) : "";
+    const d = cl.data || {}, f = cl.fields || {};
+    const hat = num(d.eggHatchery) || 0, sm = num(d.eggSmash) || 0;
+    const table = any ? String(tot - hat - sm) : "";
+    if(d.egg9 === v[0] && d.egg12 === v[1] && d.egg4 === v[2] && d.eggTotal === T && d.eggTable === table) return;   // already the same
+    d.egg9 = v[0]; d.egg12 = v[1]; d.egg4 = v[2]; d.eggTotal = T; d.eggTable = table;
+    [["#egg-9am~1",v[0]],["#egg-12pm~1",v[1]],["#egg-4pm~1",v[2]],["#egg-total~1",T],["#egg-table~1",table]].forEach(p=>{ if(p[1] === "") delete f[p[0]]; else f[p[0]] = p[1]; });
+    cl.data = d; cl.fields = f;
+    cplDbPut(date, "checklist", cl);
+  }catch(e){}
+}
 function saveNow(){
   const date = _shown; if(!date) return;
   const R = recalc();
   if(hasData(R.rows)){
     const ok = cplDbPut(date, SECTION, { rows:R.rows, totals:R.totals });
+    linkToChecklist(date, R.rows);
     setStatus(ok ? "Saved " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " ✓ (sent to the cloud if connected)" : "Could not save on this device.");
   } else if(cplDbGet(date, SECTION)){
     cplDbPut(date, SECTION, { deleted:true });

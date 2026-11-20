@@ -541,6 +541,7 @@
       <div class="field"><label>Current Egg Storage</label><input type="number" id="egg-current-storage"></div>
       <div class="field"><label>Total Storage Egg (auto)</label><input type="number" id="egg-total-storage" readonly style="background:#f0efe8;color:#b3261e;font-weight:800;"></div>
     </div>
+    <p class="hint" id="egg-seg-note" style="display:none;color:#2b4127;font-weight:700;">🔗 9:00 AM, 12:00 PM, 4:00 PM and Total Eggs come from the Segregation app for this date. To change them, change the Total figures in the Segregation app.</p>
     <p class="hint">Table Eggs = Total Eggs − Hatchery Eggs − Smash Eggs, calculated automatically.</p>
     <p class="hint">Total Storage Egg = Total Hatchery Eggs + Current Egg Storage, calculated automatically.</p>
   </div>
@@ -1485,6 +1486,35 @@ document.addEventListener("change", cplScheduleSave);
 document.addEventListener("click", (e)=>{ if(e.target.closest && e.target.closest("button")) cplScheduleSave(); });
 cplStatus("Pick a Date to start saving this record automatically.");
 
+// ---- Link to the Segregation app: its Total for each time fills the egg collection boxes ----
+const SEG_EGG_IDS = ["egg-9am","egg-12pm","egg-4pm"];
+function segLinkApply(){
+  const date = document.getElementById("f-date").value;
+  const note = document.getElementById("egg-seg-note");
+  let sg = null; try{ sg = date ? cplDbGet(date, "segregation") : null; }catch(e){}
+  const vals = (sg && sg.rows) ? SEG_EGG_IDS.map((x,i)=>{ const r = sg.rows[i]; const v = r ? parseFloat(r.total) : NaN; return isNaN(v) ? "" : String(v); }) : null;
+  const linked = !!(vals && vals.some(v=>v !== ""));
+  let changed = false;
+  SEG_EGG_IDS.forEach((id,i)=>{
+    const el = document.getElementById(id);
+    if(linked){
+      if(el.value !== vals[i]){ el.value = vals[i]; changed = true; }
+      el.readOnly = true; el.style.background = "#e8efe4"; el.title = "From the Segregation app";
+    } else if(el.readOnly){
+      el.readOnly = false; el.style.background = ""; el.title = "";
+    }
+  });
+  note.style.display = linked ? "block" : "none";
+  if(changed){ autoTotalEggs(); if(!_cplRestoring) cplScheduleSave(); }
+  return linked;
+}
+document.getElementById("f-date").addEventListener("change", segLinkApply);
+window.addEventListener("storage", e=>{ if(e.key === CPL_DB_KEY) segLinkApply(); });   // Segregation open in another tab
+window.addEventListener("focus", segLinkApply);
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) segLinkApply(); });
+window.cplAfterSync = segLinkApply;   // figures typed on another device
+setInterval(segLinkApply, 3000);
+
 
 
 // ================= OFFLINE RECORDS DATABASE (shared by the CPL apps) =================
@@ -1914,6 +1944,7 @@ function clearForm(){
   vaccDefaultGenders();
   syncVaccHouse();
   restoreBirdStock();
+  segLinkApply();
   formTouched = false;
   clearTimeout(_cplTimer);
   cplStatus("Form cleared. The saved record for that date is still in the database — pick the date again to load it.");

@@ -296,6 +296,14 @@ function aggregate(date, rec){
   if(sg && sg.rows){
     d.hasSeg = true;
     ["total","minor","smash","small","miss","thin","dirty","xl","clean"].forEach(k=>{ d["sg_"+k] = sum(sg.rows.map(r=>n(r[k]))); });
+    // Linked: the Segregation total is the day's Total Eggs (same as the Daily Operation Checklist)
+    if(d.sg_total !== null){
+      const rt = i => sg.rows[i] ? n(sg.rows[i].total) : null;
+      d.egg9 = rt(0); d.egg12 = rt(1); d.egg4 = rt(2); d.eggTotal = d.sg_total;
+      d.eggTable = d.sg_total - (d.eggHatchery||0) - (d.eggSmash||0);
+      d.hatchPct = (d.eggTotal && d.eggHatchery!==null && d.eggHatchery!==undefined) ? d.eggHatchery/d.eggTotal*100 : null;
+      d.eggFromSeg = true;
+    }
   }
   const f = rec.feedstock;
   if(f){ d.stockKg = n(f.grandTotal); d.stockRows = f.rows||[]; }
@@ -947,6 +955,9 @@ async function diagnoseSync(){
   }catch(e){ box.textContent = "Could not reach the cloud: "+(e&&e.message?e.message:"check the internet and the URL"); }
 }
 window.cplAfterSync = function(){ try{ refresh(); showSyncState(); }catch(e){} };
+// Update straight away when the Segregation or Checklist app is changed in another tab
+window.addEventListener("storage", e=>{ if(e.key === CPL_DB_KEY){ try{ refresh(); }catch(x){} } });
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden){ try{ refresh(); }catch(x){} } });
 
 // ============================ START ============================
 (function init(){
