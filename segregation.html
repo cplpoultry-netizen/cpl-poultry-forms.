@@ -30,6 +30,13 @@
   tr.totalbar td{ background:#f6b26b; font-weight:800; font-size:15px; border-color:#d98e3a; }
   tr.totalbar td.time{ background:#f6b26b; }
   .chk{ font-size:12px; font-weight:700; }
+  td.tbl{ background:#fdf1dc; font-weight:800; color:#7a4f0e; min-width:56px; }
+  tr.totalbar td.tbl{ background:#e8963c; color:#1f2a1f; }
+  .tblgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:6px; }
+  .tblgrid div{ border:1px solid var(--line); border-radius:8px; padding:6px; text-align:center; background:#fbfaf5; }
+  .tblgrid b{ display:block; font-size:16px; } .tblgrid span{ font-size:11px; color:#6b6b5e; }
+  .tbltotal{ margin-top:8px; border:2px solid var(--amber); background:#fdf1dc; border-radius:10px; padding:10px; text-align:center; }
+  .tbltotal b{ display:block; font-size:26px; color:#7a4f0e; } .tbltotal span{ font-size:12px; font-weight:700; color:var(--green-dark); }
   .chk.ok{ color:#2a7a2a; } .chk.off{ color:#b36b00; }
   .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
   .kpi{ border:1px solid var(--line); border-radius:8px; padding:8px; text-align:center; background:#fbfaf5; }
@@ -62,13 +69,20 @@
     <div class="scroll-x">
       <table id="seg-table">
         <thead><tr>
-          <th>Time</th><th>Total</th><th>Minor<br>Crack</th><th>Smash</th><th>Small</th><th>Miss<br>Shape</th><th>Thin<br>Shell</th><th>Dirty</th><th>Extra<br>Large</th><th>Clean</th><th>Check</th>
+          <th>Time</th><th>Total</th><th>Minor<br>Crack</th><th>Smash</th><th>Small</th><th>Miss<br>Shape</th><th>Thin<br>Shell</th><th>Dirty</th><th>Extra<br>Large</th><th>Clean</th><th>Table<br>Eggs</th><th>Check</th>
         </tr></thead>
         <tbody id="seg-body"></tbody>
       </table>
     </div>
     <p class="hint"><b>Linked:</b> each time's Total is also put into the Daily Operation Checklist (9:00 AM, 12:00 PM, 4:00 PM and Total Eggs) and the Monthly Records for the same date.</p>
     <p class="hint">Type the figures for each time. The orange TOTAL bar adds up every column by itself. "Check" shows ✓ when the Minor Crack to Clean columns (including Extra Large) add up to that row's Total; otherwise it shows how many eggs are different, so you can spot a typing mistake.</p>
+  </div>
+
+  <div class="card">
+    <h2>Table eggs — every egg that is not Clean</h2>
+    <div class="tblgrid" id="tbl-list"></div>
+    <div class="tbltotal"><b id="tbl-total">—</b><span>TOTAL TABLE EGGS (auto)</span></div>
+    <p class="hint">Table Eggs = Minor Crack + Smash + Small + Miss Shape + Thin Shell + Dirty + Extra Large. Clean eggs are not included. This total also goes to the Monthly Records app.</p>
   </div>
 
   <div class="card">
@@ -238,13 +252,13 @@ let _loading = false, _timer = null, _lastTyped = 0, _shown = "";   // _shown = 
     const tr = document.createElement("tr");
     let h = '<td class="time">' + t + "</td>";
     COLS.forEach(c=>{ h += '<td><input type="number" inputmode="numeric" min="0" step="1" id="s' + r + "_" + c[0] + '" data-r="' + r + '" data-k="' + c[0] + '"></td>'; });
-    h += '<td class="chk" id="chk' + r + '"></td>';
+    h += '<td class="tbl" id="tb' + r + '">—</td><td class="chk" id="chk' + r + '"></td>';
     tr.innerHTML = h; tb.appendChild(tr);
   });
   const tot = document.createElement("tr"); tot.className = "totalbar";
   let h = '<td class="time">TOTAL</td>';
   COLS.forEach(c=>{ h += '<td id="t_' + c[0] + '">—</td>'; });
-  h += "<td></td>"; tot.innerHTML = h; tb.appendChild(tot);
+  h += '<td class="tbl" id="t_table">—</td><td></td>'; tot.innerHTML = h; tb.appendChild(tot);
 })();
 
 function num(v){ const x = parseFloat(v); return isNaN(x) ? null : x; }
@@ -252,8 +266,11 @@ function fmt(x){ return (x === null || x === undefined) ? "—" : Number(x).toLo
 function readRows(){
   return SLOTS.map((t,r)=>{ const o = { time:t }; COLS.forEach(c=>{ o[c[0]] = document.getElementById("s"+r+"_"+c[0]).value.trim(); }); return o; });
 }
+const TABLE_KEYS = ["minor","smash","small","miss","thin","dirty","xl"];   // every category except Clean
+function tableOf(o){ let s = 0, any = false; TABLE_KEYS.forEach(k=>{ const v = num(o[k]); if(v !== null){ s += v; any = true; } }); return any ? s : null; }
 function columnTotals(rows){
   const T = {}; COLS.forEach(c=>{ let s = 0, any = false; rows.forEach(r=>{ const v = num(r[c[0]]); if(v !== null){ s += v; any = true; } }); T[c[0]] = any ? s : null; });
+  T.table = tableOf(T);
   return T;
 }
 function rowCheck(r){
@@ -264,6 +281,10 @@ function rowCheck(r){
 function recalc(){
   const rows = readRows(), T = columnTotals(rows);
   COLS.forEach(c=>{ document.getElementById("t_"+c[0]).textContent = fmt(T[c[0]]); });
+  document.getElementById("t_table").textContent = fmt(T.table);
+  rows.forEach((r,i)=>{ document.getElementById("tb"+i).textContent = fmt(tableOf(r)); });
+  document.getElementById("tbl-list").innerHTML = TABLE_KEYS.map(k=>"<div><b>" + fmt(T[k]) + "</b><span>" + COLS.find(c=>c[0]===k)[1] + "</span></div>").join("");
+  document.getElementById("tbl-total").textContent = fmt(T.table);
   rows.forEach((r,i)=>{
     const d = rowCheck(r), el = document.getElementById("chk"+i);
     if(d === null){ el.textContent = ""; el.className = "chk"; }
@@ -274,8 +295,7 @@ function recalc(){
   k.push([fmt(T.total), "Total eggs"]);
   k.push([fmt(T.clean), "Clean eggs"]);
   k.push([(T.total && T.clean !== null) ? (Math.round(T.clean / T.total * 1000) / 10) + "%" : "—", "Clean % of total"]);
-  let bad = 0, anyBad = false; ["minor","smash","small","miss","thin","dirty"].forEach(x=>{ if(T[x] !== null){ bad += T[x]; anyBad = true; } });
-  k.push([anyBad ? fmt(bad) : "—", "Not clean (all faults)"]);
+  k.push([fmt(T.table), "Table eggs (all except clean)"]);
   document.getElementById("kpis").innerHTML = k.map(x=>"<div class='kpi'><b>" + x[0] + "</b><span>" + x[1] + "</span></div>").join("");
   return { rows:rows, totals:T };
 }
@@ -303,7 +323,7 @@ function saveNow(){
   const date = _shown; if(!date) return;
   const R = recalc();
   if(hasData(R.rows)){
-    const ok = cplDbPut(date, SECTION, { rows:R.rows, totals:R.totals });
+    const ok = cplDbPut(date, SECTION, { rows:R.rows, totals:R.totals, tableEggs:R.totals.table });
     linkToChecklist(date, R.rows);
     setStatus(ok ? "Saved " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " ✓ (sent to the cloud if connected)" : "Could not save on this device.");
   } else if(cplDbGet(date, SECTION)){
@@ -367,19 +387,27 @@ function generatePDF(){
   doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(0,0,0);
   doc.text("CPL Poultry Division — Coconut Products Limited, Kokopo", W/2, 60, { align:"center" });
   doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text("Date: " + nice, mL, 88);
-  const body = R.rows.map(r=>[r.time].concat(COLS.map(c=>r[c[0]] === "" ? "—" : r[c[0]])));
-  const foot = ["TOTAL"].concat(COLS.map(c=>fmt(R.totals[c[0]])));
+  const body = R.rows.map(r=>[r.time].concat(COLS.map(c=>r[c[0]] === "" ? "—" : r[c[0]])).concat([fmt(tableOf(r))]));
+  const foot = ["TOTAL"].concat(COLS.map(c=>fmt(R.totals[c[0]]))).concat([fmt(R.totals.table)]);
   doc.autoTable({ startY:98, margin:{ left:mL, right:mR }, theme:"grid",
-    head:[["Time","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Extra Large","Clean"]], body:body, foot:[foot], showFoot:"lastPage", rowPageBreak:"avoid",
-    styles:{ fontSize:10, cellPadding:7, halign:"center", valign:"middle", lineColor:[180,176,160], lineWidth:0.6 },
+    head:[["Time","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Extra Large","Clean","Table Eggs"]], body:body, foot:[foot], showFoot:"lastPage", rowPageBreak:"avoid",
+    styles:{ fontSize:9, cellPadding:6, halign:"center", valign:"middle", lineColor:[180,176,160], lineWidth:0.6 },
     headStyles:{ fillColor:GREEN, textColor:255, fontStyle:"bold" },
     footStyles:{ fillColor:[246,178,107], textColor:[20,20,20], fontStyle:"bold", fontSize:12 },
-    columnStyles:{ 0:{ halign:"left", fontStyle:"bold" } } });
-  let y = doc.lastAutoTable.finalY + 22;
+    columnStyles:{ 0:{ halign:"left", fontStyle:"bold" }, 10:{ fillColor:[253,241,220], fontStyle:"bold" } } });
+  let y = doc.lastAutoTable.finalY + 20;
+  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...GREEN); doc.text("Table eggs — every egg that is not Clean", mL, y);
+  doc.autoTable({ startY:y+6, margin:{ left:mL, right:mR }, theme:"grid", tableWidth:300,
+    head:[["Category","Eggs"]], body:TABLE_KEYS.map(k=>[COLS.find(c=>c[0]===k)[1], fmt(R.totals[k])]), foot:[["TOTAL TABLE EGGS", fmt(R.totals.table)]], showFoot:"lastPage", rowPageBreak:"avoid",
+    styles:{ fontSize:10, cellPadding:5, lineColor:[180,176,160], lineWidth:0.6 }, columnStyles:{ 1:{ halign:"center" } },
+    headStyles:{ fillColor:GREEN, textColor:255, fontStyle:"bold" },
+    footStyles:{ fillColor:[246,178,107], textColor:[20,20,20], fontStyle:"bold", fontSize:11 } });
+  y = doc.lastAutoTable.finalY + 20;
   const T = R.totals, lines = [];
   if(T.total) lines.push("Total eggs segregated: " + fmt(T.total));
   if(T.clean !== null && T.total) lines.push("Clean eggs: " + fmt(T.clean) + " (" + (Math.round(T.clean / T.total * 1000) / 10) + "% of total)");
-  doc.setFont("helvetica","normal"); doc.setFontSize(11);
+  if(T.table !== null && T.total) lines.push("Table eggs (all except clean): " + fmt(T.table) + " (" + (Math.round(T.table / T.total * 1000) / 10) + "% of total)");
+  doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(0,0,0);
   lines.forEach(l=>{ doc.text(l, mL, y); y += 16; });
   doc.setFontSize(8.5); doc.setTextColor(110,110,110);
   doc.text("Printed " + new Date().toLocaleDateString("en-GB").split("/").join(" ") + " from the CPL Segregation app.", mL, doc.internal.pageSize.getHeight() - 28);

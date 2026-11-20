@@ -296,6 +296,7 @@ function aggregate(date, rec){
   if(sg && sg.rows){
     d.hasSeg = true;
     ["total","minor","smash","small","miss","thin","dirty","xl","clean"].forEach(k=>{ d["sg_"+k] = sum(sg.rows.map(r=>n(r[k]))); });
+    d.sg_table = sum(["minor","smash","small","miss","thin","dirty","xl"].map(k=>d["sg_"+k]));   // Table eggs = every category except Clean
     // Linked: the Segregation total is the day's Total Eggs (same as the Daily Operation Checklist)
     if(d.sg_total !== null){
       const rt = i => sg.rows[i] ? n(sg.rows[i].total) : null;
@@ -338,7 +339,7 @@ function summarize(days){
   S.hPct = S.hFertile ? (S.hHatch||0)/S.hFertile*100 : null;
   S.hBatches = tot("hCount");
   S.hInf=tot("h_infertile"); S.hDam=tot("h_damage"); S.hBomb=tot("h_bomb"); S.hMort=tot("h_mortality"); S.hCull=tot("h_cull"); S.hDic=tot("h_dic"); S.hUnh=tot("h_unhatched");
-  S.sgTotal=tot("sg_total"); S.sgClean=tot("sg_clean"); S.sgMinor=tot("sg_minor"); S.sgSmash=tot("sg_smash"); S.sgSmall=tot("sg_small"); S.sgMiss=tot("sg_miss"); S.sgThin=tot("sg_thin"); S.sgDirty=tot("sg_dirty"); S.sgXl=tot("sg_xl");
+  S.sgTotal=tot("sg_total"); S.sgClean=tot("sg_clean"); S.sgMinor=tot("sg_minor"); S.sgSmash=tot("sg_smash"); S.sgSmall=tot("sg_small"); S.sgMiss=tot("sg_miss"); S.sgThin=tot("sg_thin"); S.sgDirty=tot("sg_dirty"); S.sgXl=tot("sg_xl"); S.sgTable=tot("sg_table");
   S.sgPct = S.sgTotal ? (S.sgClean||0)/S.sgTotal*100 : null;
   S.fanDays = days.filter(d=>d.fanFaults>0).length;
   S.tempAM=avg(days.map(d=>d.hTempAM===undefined?null:d.hTempAM)); S.tempPM=avg(days.map(d=>d.hTempPM===undefined?null:d.hTempPM));
@@ -358,7 +359,7 @@ function totalsFor(S){
     ["Hatchery: Egg set",S.hSet,C.green],["Hatchery: Infertile",S.hInf,C.grey],["Hatchery: Damage",S.hDam,C.grey],["Hatchery: Bomb",S.hBomb,C.grey],
     ["Hatchery: Candling fertile",S.hFertile,C.blue],["Hatchery: Hatch chicks",S.hHatch,C.amber],["Hatchery: Chick mortality",S.hMort,C.red],
     ["Hatchery: Cull",S.hCull,C.red],["Hatchery: DIC",S.hDic,C.red],["Hatchery: Salable chicks",S.hSalable,C.green],["Hatchery: Unhatched",S.hUnh,C.pink],
-    ["Segregation: Total eggs",S.sgTotal,C.green],["Segregation: Clean",S.sgClean,C.leaf],["Segregation: Minor crack",S.sgMinor,C.amber],["Segregation: Smash",S.sgSmash,C.red],
+    ["Segregation: Total eggs",S.sgTotal,C.green],["Segregation: Clean",S.sgClean,C.leaf],["Segregation: Table eggs (all except clean)",S.sgTable,C.amber],["Segregation: Minor crack",S.sgMinor,C.amber],["Segregation: Smash",S.sgSmash,C.red],
     ["Segregation: Small",S.sgSmall,C.grey],["Segregation: Miss shape",S.sgMiss,C.light],["Segregation: Thin shell",S.sgThin,C.pink],["Segregation: Dirty",S.sgDirty,C.blue],["Segregation: Extra large",S.sgXl,C.amber]
   ];
   return rows.filter(r=>r[1]!==null && r[1]!==undefined);
@@ -591,7 +592,8 @@ function kpiPairs(S){
     [fmt(S.remT),"Birds remaining (latest)"], [fmt(S.feed),"Feed given (kg)"], [fmt(S.water),"Water (litres)"], [fmt(S.stockKg),"Feed stock recorded (kg)"],
     [fmt(S.storeSum),"Storage eggs — all days added up"], [fmt(S.curSum),"Current storage — all days added up"],
     [fmt(S.hBatches),"Hatchery batches"], [fmt(S.hSet),"Eggs set"], [fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"], [fmt(S.hSalable),"Salable chicks"],
-    [fmt(S.sgTotal),"Segregated eggs"], [fmt(S.sgClean)+(S.sgPct!==null?" ("+fmt(S.sgPct)+"%)":""),"Clean eggs (segregation)"]
+    [fmt(S.sgTotal),"Segregated eggs"], [fmt(S.sgClean)+(S.sgPct!==null?" ("+fmt(S.sgPct)+"%)":""),"Clean eggs (segregation)"],
+    [fmt(S.sgTable)+(S.sgTotal&&S.sgTable!==null?" ("+fmt(S.sgTable/S.sgTotal*100)+"%)":""),"Table eggs (segregation — all except clean)"]
   ];
 }
 function refresh(){
@@ -606,18 +608,18 @@ function refresh(){
   renderCharts(S);
   renderTrend(ym);
   const t = document.getElementById("days-table");
-  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Storage eggs</th><th>Mortality</th><th>Segregated</th><th></th></tr></thead>";
+  t.innerHTML = "<thead><tr><th>Date</th><th>Checklist</th><th>Feed stock</th><th>Hatchery</th><th>Eggs</th><th>Storage eggs</th><th>Mortality</th><th>Segregated</th><th>Seg. table eggs</th><th></th></tr></thead>";
   const tb = document.createElement("tbody");
   days.forEach(d=>{
     const tr = document.createElement("tr");
-    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.eggTotalStore===undefined?null:d.eggTotalStore), fmt(d.mortT===undefined?null:d.mortT), fmt(d.sg_total===undefined?null:d.sg_total)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.eggTotalStore===undefined?null:d.eggTotalStore), fmt(d.mortT===undefined?null:d.mortT), fmt(d.sg_total===undefined?null:d.sg_total), fmt(d.sg_table===undefined?null:d.sg_table)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
     const td = document.createElement("td");
     if(!SAMPLE){ const b=document.createElement("button"); b.className="danger"; b.textContent="Delete"; b.style.padding="4px 8px"; b.onclick=()=>deleteDay(d.date); td.appendChild(b); }
     tr.appendChild(td); tb.appendChild(tr);
   });
   if(days.length){
     const tr = document.createElement("tr"); tr.style.fontWeight = "800";
-    ["MONTH TOTAL","","","",fmt(S.eggs),fmt(S.storeSum),fmt(S.mortT),fmt(S.sgTotal),""].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
+    ["MONTH TOTAL","","","",fmt(S.eggs),fmt(S.storeSum),fmt(S.mortT),fmt(S.sgTotal),fmt(S.sgTable),""].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
     tb.appendChild(tr);
   }
   t.appendChild(tb);
@@ -709,14 +711,17 @@ function sampleRecords(ym){
 }
 
 // ============================ PDF ============================
-// The Monthly PDF is always 3 pages: 1) summary + graph, 2) daily tables, 3) everything else.
+// The Monthly PDF: page 1) summary + graph, then the daily tables, then hatchery, segregation, logs & remarks. Tables carry on to new pages when a page is full, so every entry is printed.
 function cutText(s, n){ s = (s === undefined || s === null || s === "") ? "—" : String(s); return s.length > n ? s.slice(0, n-1) + "…" : s; }
 function buildMonthlyDoc(days, S, title, graph, fs, trend){
   const doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4", orientation:"portrait" });
   const GREEN = [43,65,39], RED = [179,38,30], M = 24, PAD = 1.1;
   const pw = ()=>doc.internal.pageSize.getWidth(), ph = ()=>doc.internal.pageSize.getHeight();
-  const rowH = fs*1.15 + PAD*2;
-  function banner(sub){
+  const rowH = fs*1.15 + PAD*2 + 1;
+  const bannered = {}; let curSub = "";
+  function banner(sub, cont){
+    if(!cont) curSub = sub;
+    bannered[doc.getCurrentPageInfo().pageNumber] = true;
     doc.setFillColor(...GREEN); doc.rect(0,0,pw(),40,"F");
     doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(14);
     doc.text(title+" — Monthly Poultry Records"+(SAMPLE?" (SAMPLE DATA)":""), M, 18);
@@ -727,8 +732,12 @@ function buildMonthlyDoc(days, S, title, graph, fs, trend){
   const E = v=>fmt(v===undefined?null:v);
   const T = k=>fmt(sum(days.map(d=>d[k]===undefined?null:d[k])));
   const A = k=>fmt(avg(days.map(d=>d[k]===undefined?null:d[k])));
-  const baseOpts = ()=>({ margin:{left:M,right:M,top:48,bottom:30}, pageBreak:"avoid", rowPageBreak:"avoid", showFoot:"lastPage",
-    styles:{ fontSize:fs, cellPadding:PAD, halign:"center", valign:"middle", overflow:"ellipsize", lineColor:[200,196,184], lineWidth:0.3 },
+  const full = s=>(s === undefined || s === null || String(s).trim() === "") ? "—" : String(s);
+  // A table that runs off the bottom carries on to a new page: banner, "(continued)" heading and the column titles are repeated there.
+  const baseOpts = (secTitle)=>({ margin:{left:M,right:M,top:64,bottom:34}, pageBreak:"auto", rowPageBreak:"avoid", showHead:"everyPage", showFoot:"lastPage",
+    didDrawPage:()=>{ const p = doc.getCurrentPageInfo().pageNumber;
+      if(!bannered[p]){ banner(curSub+" (continued)", true); if(secTitle) heading(secTitle+" (continued)", 56); } },
+    styles:{ fontSize:fs, cellPadding:PAD, halign:"center", valign:"middle", overflow:"linebreak", lineColor:[200,196,184], lineWidth:0.3 },
     headStyles:{ fillColor:GREEN, textColor:255, fontStyle:"bold", fontSize:fs },
     footStyles:{ fillColor:[240,236,220], textColor:20, fontStyle:"bold", fontSize:fs },
     alternateRowStyles:{ fillColor:[248,246,239] } });
@@ -762,29 +771,40 @@ function buildMonthlyDoc(days, S, title, graph, fs, trend){
     doc.setTextColor(0,0,0);
   }
 
-  // ---------- Page 2: daily tables ----------
-  doc.addPage("a4","portrait"); banner("Daily tables");
-  heading("Daily records (eggs, storage, mortality, feed, water)", 60);
-  doc.autoTable(Object.assign(baseOpts(), { startY:66,
-    head:[["Date","Total Eggs","Hatchery","Table","Smash","Storage Eggs","Mort. Male","Mort. Female","Feed Male kg","Feed Female kg","Water L","Feed Stock kg"]],
-    body: days.map(d=>[niceDate(d.date),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),E(d.eggTotalStore),E(d.mortM),E(d.mortF),E(d.feedM),E(d.feedF),E(d.water),E(d.stockKg)]),
-    foot:[["MONTH TOTAL",T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),T("eggTotalStore"),T("mortM"),T("mortF"),T("feedM"),T("feedF"),T("water"),T("stockKg")]] }));
+  // ---------- Page 2 onwards: daily tables (as many pages as needed) ----------
+  const bottom = ph() - 34;
+  function newPage(sub){ doc.addPage("a4","portrait"); banner(sub); return 58; }
+  // Prints one titled table. Starts a new page when there is not enough room for the heading, the column titles and a few rows.
+  // Long tables carry on to the next pages, with the banner, "(continued)" heading and column titles repeated.
+  function section(y, title, head, body, foot, opts){
+    opts = opts || {};
+    const need = 16 + rowH*(foot ? 5 : 4) + 6;
+    if(y + need > bottom) y = newPage(curSub);
+    heading(title, y+8);
+    const cs = {}; (opts.left||[]).forEach(c=>{ cs[c] = { halign:"left" }; });
+    if(opts.widths) Object.keys(opts.widths).forEach(c=>{ cs[c] = Object.assign(cs[c]||{}, { cellWidth:opts.widths[c] }); });
+    doc.autoTable(Object.assign(baseOpts(title), { startY:y+12, head:[head], body:body, columnStyles:cs, foot: foot ? [foot] : undefined }));
+    return doc.lastAutoTable.finalY + 12;
+  }
+  let py = newPage("Daily tables");
+  py = section(py, "Daily records (eggs, storage, mortality, feed, water)",
+    ["Date","Total Eggs","Hatchery","Table","Smash","Storage Eggs","Mort. Male","Mort. Female","Feed Male kg","Feed Female kg","Water L","Feed Stock kg"],
+    days.map(d=>[niceDate(d.date),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),E(d.eggTotalStore),E(d.mortM),E(d.mortF),E(d.feedM),E(d.feedF),E(d.water),E(d.stockKg)]),
+    ["MONTH TOTAL",T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),T("eggTotalStore"),T("mortM"),T("mortF"),T("feedM"),T("feedF"),T("water"),T("stockKg")]);
   const cl = days.filter(d=>d.hasChecklist);
   if(cl.length){
-    let y2 = doc.lastAutoTable.finalY + 16;
-    heading("House, Setter & Hatcher environment — daily averages", y2);
-    doc.autoTable(Object.assign(baseOpts(), { startY:y2+6,
-      head:[["Date","H °C AM","H °C PM","H % AM","H % PM","S °C AM","S °C PM","Hc °C AM","Hc °C PM","S % AM","S % PM","Hc % AM","Hc % PM","Egg °C AM","Egg °C PM","Fans"]],
-      body: cl.map(d=>[niceDate(d.date),E(d.hTempAM),E(d.hTempPM),E(d.hHumAM),E(d.hHumPM),E(d.sTempAM),E(d.sTempPM),E(d.hcTempAM),E(d.hcTempPM),E(d.sHumAM),E(d.sHumPM),E(d.hcHumAM),E(d.hcHumPM),E(d.eggTempAM),E(d.eggTempPM),E(d.fanFaults)]),
-      foot:[["AVERAGE",A("hTempAM"),A("hTempPM"),A("hHumAM"),A("hHumPM"),A("sTempAM"),A("sTempPM"),A("hcTempAM"),A("hcTempPM"),A("sHumAM"),A("sHumPM"),A("hcHumAM"),A("hcHumPM"),A("eggTempAM"),A("eggTempPM"),T("fanFaults")]] }));
+    py = section(py, "House, Setter & Hatcher environment — daily averages",
+      ["Date","H °C AM","H °C PM","H % AM","H % PM","S °C AM","S °C PM","Hc °C AM","Hc °C PM","S % AM","S % PM","Hc % AM","Hc % PM","Egg °C AM","Egg °C PM","Fans"],
+      cl.map(d=>[niceDate(d.date),E(d.hTempAM),E(d.hTempPM),E(d.hHumAM),E(d.hHumPM),E(d.sTempAM),E(d.sTempPM),E(d.hcTempAM),E(d.hcTempPM),E(d.sHumAM),E(d.sHumPM),E(d.hcHumAM),E(d.hcHumPM),E(d.eggTempAM),E(d.eggTempPM),E(d.fanFaults)]),
+      ["AVERAGE",A("hTempAM"),A("hTempPM"),A("hHumAM"),A("hHumPM"),A("sTempAM"),A("sTempPM"),A("hcTempAM"),A("hcTempPM"),A("sHumAM"),A("sHumPM"),A("hcHumAM"),A("hcHumPM"),A("eggTempAM"),A("eggTempPM"),T("fanFaults")]);
+    if(py + 6 > bottom) py = newPage(curSub);
     doc.setFont("helvetica","normal"); doc.setFontSize(6.5); doc.setTextColor(90,90,90);
-    doc.text("H = House, S = Setters, Hc = Hatchers (daily averages). Fans = faulty fans that day.", M, doc.lastAutoTable.finalY + 10);
+    doc.text("H = House, S = Setters, Hc = Hatchers (daily averages). Fans = faulty fans that day.", M, py - 4);
     doc.setTextColor(0,0,0);
   }
 
-  // ---------- Page 3: everything else, sized to fit ----------
-  doc.addPage("a4","portrait"); banner("Hatchery, logs & remarks");
-  let py = 58;
+  // ---------- Next page: hatchery, segregation, logs & remarks (as many pages as needed) ----------
+  py = newPage("Hatchery, logs & remarks");
   if(trend){
     heading("Hatchery trend — actual against standard (as at "+niceDate(trend.asAt)+")", py+4);
     const tg = 8, tw = (pw()-2*M-tg)/2, th = tw*460/700;
@@ -794,58 +814,52 @@ function buildMonthlyDoc(days, S, title, graph, fs, trend){
     doc.setTextColor(0,0,0);
     py += th + 30;
   }
-  const sections = [];
+  let any = false;
   const sDays = days.filter(d=>d.hasSeg);
   if(sDays.length){
+    any = true;
     const ST = k=>fmt(sum(sDays.map(d=>d[k]===undefined?null:d[k])));
-    sections.push({ h:"Egg segregation — daily totals (Segregation app)", head:["Date","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Extra Large","Clean","Clean %"],
-      rows:sDays.map(d=>[niceDate(d.date),E(d.sg_total),E(d.sg_minor),E(d.sg_smash),E(d.sg_small),E(d.sg_miss),E(d.sg_thin),E(d.sg_dirty),E(d.sg_xl),E(d.sg_clean),(d.sg_total?fmt((d.sg_clean||0)/d.sg_total*100)+"%":"—")]),
-      foot:["TOTAL",ST("sg_total"),ST("sg_minor"),ST("sg_smash"),ST("sg_small"),ST("sg_miss"),ST("sg_thin"),ST("sg_dirty"),ST("sg_xl"),ST("sg_clean"),S.sgPct===null?"—":fmt(S.sgPct)+"%"] });
+    py = section(py, "Egg segregation — daily totals (Segregation app)",
+      ["Date","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Extra Large","Table Eggs","Clean","Clean %"],
+      sDays.map(d=>[niceDate(d.date),E(d.sg_total),E(d.sg_minor),E(d.sg_smash),E(d.sg_small),E(d.sg_miss),E(d.sg_thin),E(d.sg_dirty),E(d.sg_xl),{content:E(d.sg_table),styles:{fontStyle:"bold"}},E(d.sg_clean),(d.sg_total?fmt((d.sg_clean||0)/d.sg_total*100)+"%":"—")]),
+      ["TOTAL",ST("sg_total"),ST("sg_minor"),ST("sg_smash"),ST("sg_small"),ST("sg_miss"),ST("sg_thin"),ST("sg_dirty"),ST("sg_xl"),ST("sg_table"),ST("sg_clean"),S.sgPct===null?"—":fmt(S.sgPct)+"%"]);
+    if(py + 6 > bottom) py = newPage(curSub);
+    doc.setFont("helvetica","normal"); doc.setFontSize(6.5); doc.setTextColor(90,90,90);
+    doc.text("Table Eggs = Minor Crack + Smash + Small + Miss Shape + Thin Shell + Dirty + Extra Large (every egg that is not Clean).", M, py - 4);
+    doc.setTextColor(0,0,0);
   }
   const hDays = days.filter(d=>d.hasHatchery && d.hCount);
   const HT = k=>fmt(sum(hDays.map(d=>d[k]===undefined?null:d[k])));
   if(hDays.length){
-    sections.push({ h:"Hatchery — daily totals", head:["Date","Batches","Egg Set","Infertile","Damage","Bomb","Fertile","Hatched","Mortality","Cull","DIC","Salable","Unhatched","Hatch %"],
-      rows:hDays.map(d=>[niceDate(d.date),String(d.hCount),E(d.h_eggSet),E(d.h_infertile),E(d.h_damage),E(d.h_bomb),E(d.h_fertile),E(d.h_hatchChicks),E(d.h_mortality),E(d.h_cull),E(d.h_dic),E(d.h_salable),E(d.h_unhatched),d.hPct===null||d.hPct===undefined?"—":fmt(d.hPct)+"%"]),
-      foot:["TOTAL",fmt(S.hBatches),HT("h_eggSet"),HT("h_infertile"),HT("h_damage"),HT("h_bomb"),HT("h_fertile"),HT("h_hatchChicks"),HT("h_mortality"),HT("h_cull"),HT("h_dic"),HT("h_salable"),HT("h_unhatched"),S.hPct===null?"—":fmt(S.hPct)+"%"] });
-    const b = []; hDays.forEach(d=>d.hBatches.forEach(x=>b.push([niceDate(d.date),cutText(x.batch,10),x.setDate?niceDate(x.setDate):"—",x.transferDate?niceDate(x.transferDate):"—",x.hatchDate?niceDate(x.hatchDate):"—",fmt(n(x.eggSet)),fmt(n(x.fertile)),fmt(n(x.hatchChicks)),fmt(n(x.salable)),fmt(n(x.unhatched)),x.fertilePct||"—"])));
-    sections.push({ h:"Hatchery — batch details", head:["Record Date","Batch","Set Date","Transfer Date","Hatch Date","Egg Set","Fertile","Hatched","Salable","Unhatched","Fertile %"], rows:b });
+    any = true;
+    py = section(py, "Hatchery — daily totals",
+      ["Date","Batches","Egg Set","Infertile","Damage","Bomb","Fertile","Hatched","Mortality","Cull","DIC","Salable","Unhatched","Hatch %"],
+      hDays.map(d=>[niceDate(d.date),String(d.hCount),E(d.h_eggSet),E(d.h_infertile),E(d.h_damage),E(d.h_bomb),E(d.h_fertile),E(d.h_hatchChicks),E(d.h_mortality),E(d.h_cull),E(d.h_dic),E(d.h_salable),E(d.h_unhatched),d.hPct===null||d.hPct===undefined?"—":fmt(d.hPct)+"%"]),
+      ["TOTAL",fmt(S.hBatches),HT("h_eggSet"),HT("h_infertile"),HT("h_damage"),HT("h_bomb"),HT("h_fertile"),HT("h_hatchChicks"),HT("h_mortality"),HT("h_cull"),HT("h_dic"),HT("h_salable"),HT("h_unhatched"),S.hPct===null?"—":fmt(S.hPct)+"%"]);
+    const b = []; hDays.forEach(d=>d.hBatches.forEach(x=>b.push([niceDate(d.date),full(x.batch),x.setDate?niceDate(x.setDate):"—",x.transferDate?niceDate(x.transferDate):"—",x.hatchDate?niceDate(x.hatchDate):"—",fmt(n(x.eggSet)),fmt(n(x.fertile)),fmt(n(x.hatchChicks)),fmt(n(x.salable)),fmt(n(x.unhatched)),x.fertilePct||"—"])));
+    py = section(py, "Hatchery — batch details", ["Record Date","Batch","Set Date","Transfer Date","Hatch Date","Egg Set","Fertile","Hatched","Salable","Unhatched","Fertile %"], b);
   }
-  const frows = []; let ftot = 0;
-  days.forEach(d=>(d.stockRows||[]).forEach(r=>{ frows.push([niceDate(d.date),cutText(r.name,24),fmt(r.bags),fmt(r.kgPerBag),fmt(r.totalKg)]); ftot += r.totalKg||0; }));
-  // vaccination & mortality: one line per day (Male and Female together) so it fits the page
+  // vaccination & mortality: one line per day (Male and Female together); long findings and actions wrap onto extra lines
   const vrows = [];
   days.forEach(d=>{
     if(!d.raw) return;
     const list = (d.raw.vacc||[]).filter(v=>v.vaccine||v.mortality||v.finding);
     if(!list.length) return;
     const uniq = (k)=>Array.from(new Set(list.map(v=>String(v[k]||"").trim()).filter(Boolean)));
-    vrows.push([niceDate(d.date), cutText(uniq("house").join(", "),8), cutText(uniq("vaccine").join(", "),24), d.mortM===null||d.mortM===undefined?"—":fmt(d.mortM), d.mortF===null||d.mortF===undefined?"—":fmt(d.mortF), cutText(uniq("finding").join("; "),40), cutText(uniq("action").join("; "),44)]);
+    vrows.push([niceDate(d.date), full(uniq("house").join(", ")), full(uniq("vaccine").join(", ")), d.mortM===null||d.mortM===undefined?"—":fmt(d.mortM), d.mortF===null||d.mortF===undefined?"—":fmt(d.mortF), full(uniq("finding").join("; ")), full(uniq("action").join("; "))]);
   });
+  if(vrows.length){ any = true; py = section(py, "Vaccination & mortality log", ["Date","House","Vaccine","Mortality Male","Mortality Female","Findings","Action"], vrows, null, { left:[1,2,5,6], widths:{0:40,3:42,4:46,5:150,6:150} }); }
   const rrows = [];
   days.forEach(d=>{ if(!d.raw) return;
-    (d.raw.fan||[]).forEach(f=>{ if(f.ok==="Faulty" || f.remarks) rrows.push([niceDate(d.date),cutText("Fan: "+(f.name||""),22),cutText((f.status||"—")+" / "+(f.ok||"—"),16),cutText(f.remarks,48)]); });
-    (d.raw.setter||[]).forEach(s=>{ if(s.remarks) rrows.push([niceDate(d.date),cutText(s.name||"Setter",22),"",cutText(s.remarks,48)]); });
-    (d.raw.house||[]).forEach(h=>{ if(h.remarks || h.ok==="Not OK" || h.ok==="Faulty") rrows.push([niceDate(d.date),cutText("House "+(h.house||"")+" ("+(h.time||"")+")",22),cutText(h.ok,16),cutText(h.remarks,48)]); });
+    (d.raw.fan||[]).forEach(f=>{ if(f.ok==="Faulty" || f.remarks) rrows.push([niceDate(d.date),full("Fan: "+(f.name||"")),full((f.status||"—")+" / "+(f.ok||"—")),full(f.remarks)]); });
+    (d.raw.setter||[]).forEach(s=>{ if(s.remarks) rrows.push([niceDate(d.date),full(s.name||"Setter"),"",full(s.remarks)]); });
+    (d.raw.house||[]).forEach(h=>{ if(h.remarks || h.ok==="Not OK" || h.ok==="Faulty") rrows.push([niceDate(d.date),full("House "+(h.house||"")+" ("+(h.time||"")+")"),full(h.ok),full(h.remarks)]); });
   });
-  if(vrows.length) sections.push({ h:"Vaccination & mortality log", head:["Date","House","Vaccine","Mortality Male","Mortality Female","Findings","Action"], rows:vrows, left:[5,6] });
-  if(rrows.length) sections.push({ h:"Equipment faults & remarks", head:["Date","Area","Status","Remarks"], rows:rrows, left:[3] });
-  if(frows.length) sections.push({ h:"Feed stock records (Feed Stock Calculator)", head:["Date","Feed","Bags","Kg per Bag","Total (kg)"], rows:frows, foot:["TOTAL","","","",fmt(ftot)] });
-  if(!sections.length){ doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.text("No segregation, hatchery, vaccination, remarks or feed stock entries for this month.", M, py+8); }
-  const bottom = ph() - 34;
-  sections.forEach((sec, idx)=>{
-    const left = sections.length - idx, share = (bottom - py) / left;
-    const overhead = 14 + rowH + (sec.foot ? rowH : 0) + 8;
-    let maxRows = Math.max(2, Math.floor((share - overhead) / rowH)), body = sec.rows;
-    if(body.length > maxRows){
-      const hidden = body.length - (maxRows - 1);
-      body = body.slice(0, maxRows-1).concat([[{ content:"+ "+hidden+" more entr"+(hidden===1?"y":"ies")+" not printed (3-page limit)", colSpan:sec.head.length, styles:{ halign:"left", fontStyle:"italic" } }]]);
-    }
-    heading(sec.h, py+8);
-    const cs = {}; (sec.left||[]).forEach(c=>{ cs[c] = { halign:"left" }; });
-    doc.autoTable(Object.assign(baseOpts(), { startY:py+12, head:[sec.head], body:body, columnStyles:cs, foot: sec.foot ? [sec.foot] : undefined }));
-    py = doc.lastAutoTable.finalY + 8;
-  });
+  if(rrows.length){ any = true; py = section(py, "Equipment faults & remarks", ["Date","Area","Status","Remarks"], rrows, null, { left:[1,3], widths:{0:44,1:110,2:80} }); }
+  const frows = []; let ftot = 0;
+  days.forEach(d=>(d.stockRows||[]).forEach(r=>{ frows.push([niceDate(d.date),full(r.name),fmt(r.bags),fmt(r.kgPerBag),fmt(r.totalKg)]); ftot += r.totalKg||0; }));
+  if(frows.length){ any = true; py = section(py, "Feed stock records (Feed Stock Calculator)", ["Date","Feed","Bags","Kg per Bag","Total (kg)"], frows, ["TOTAL","","","",fmt(ftot)], { left:[1] }); }
+  if(!any){ doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.text("No segregation, hatchery, vaccination, remarks or feed stock entries for this month.", M, py+8); }
   return doc;
 }
 function generateMonthlyPDF(){
@@ -856,18 +870,13 @@ function generateMonthlyPDF(){
   const hasTotals = totalsFor(S).length > 0;
   if(hasTotals && typeof Chart === "undefined"){ alert("The chart library did not load. Connect to the internet once, reload and try again."); return; }
   const graph = hasTotals ? combinedImage(S) : null;
-  // always 3 pages: if the content runs past page 3, rebuild with smaller print
   let trend = null;
   try{
     const T = monthTrend(ym);
     if(T.has) trend = { asAt:T.asAt, fert:TR.trendImage(TR.actConfig(T.by, 2, T.nowWeek), 700, 460, 22), sale:TR.trendImage(TR.saleConfig(T.by, 2, T.nowWeek), 700, 460, 22) };
   }catch(e){ trend = null; }
-  let doc = null;
-  for(const fs of [6.5, 6, 5.5, 5, 4.6]){
-    doc = buildMonthlyDoc(days, S, title, graph, fs, trend);
-    if(doc.getNumberOfPages() <= 3) break;
-  }
-  while(doc.getNumberOfPages() > 3) doc.deletePage(doc.getNumberOfPages());
+  // No page limit: every entry is printed, and tables carry on to new pages when a page is full.
+  const doc = buildMonthlyDoc(days, S, title, graph, 7, trend);
   const total = doc.getNumberOfPages();
   for(let p=1;p<=total;p++){
     doc.setPage(p);
