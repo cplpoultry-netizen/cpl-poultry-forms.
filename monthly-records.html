@@ -295,7 +295,7 @@ function aggregate(date, rec){
   const sg = rec.segregation;
   if(sg && sg.rows){
     d.hasSeg = true;
-    ["total","minor","smash","small","miss","thin","dirty","clean"].forEach(k=>{ d["sg_"+k] = sum(sg.rows.map(r=>n(r[k]))); });
+    ["total","minor","smash","small","miss","thin","dirty","xl","clean"].forEach(k=>{ d["sg_"+k] = sum(sg.rows.map(r=>n(r[k]))); });
   }
   const f = rec.feedstock;
   if(f){ d.stockKg = n(f.grandTotal); d.stockRows = f.rows||[]; }
@@ -330,7 +330,7 @@ function summarize(days){
   S.hPct = S.hFertile ? (S.hHatch||0)/S.hFertile*100 : null;
   S.hBatches = tot("hCount");
   S.hInf=tot("h_infertile"); S.hDam=tot("h_damage"); S.hBomb=tot("h_bomb"); S.hMort=tot("h_mortality"); S.hCull=tot("h_cull"); S.hDic=tot("h_dic"); S.hUnh=tot("h_unhatched");
-  S.sgTotal=tot("sg_total"); S.sgClean=tot("sg_clean"); S.sgMinor=tot("sg_minor"); S.sgSmash=tot("sg_smash"); S.sgSmall=tot("sg_small"); S.sgMiss=tot("sg_miss"); S.sgThin=tot("sg_thin"); S.sgDirty=tot("sg_dirty");
+  S.sgTotal=tot("sg_total"); S.sgClean=tot("sg_clean"); S.sgMinor=tot("sg_minor"); S.sgSmash=tot("sg_smash"); S.sgSmall=tot("sg_small"); S.sgMiss=tot("sg_miss"); S.sgThin=tot("sg_thin"); S.sgDirty=tot("sg_dirty"); S.sgXl=tot("sg_xl");
   S.sgPct = S.sgTotal ? (S.sgClean||0)/S.sgTotal*100 : null;
   S.fanDays = days.filter(d=>d.fanFaults>0).length;
   S.tempAM=avg(days.map(d=>d.hTempAM===undefined?null:d.hTempAM)); S.tempPM=avg(days.map(d=>d.hTempPM===undefined?null:d.hTempPM));
@@ -351,7 +351,7 @@ function totalsFor(S){
     ["Hatchery: Candling fertile",S.hFertile,C.blue],["Hatchery: Hatch chicks",S.hHatch,C.amber],["Hatchery: Chick mortality",S.hMort,C.red],
     ["Hatchery: Cull",S.hCull,C.red],["Hatchery: DIC",S.hDic,C.red],["Hatchery: Salable chicks",S.hSalable,C.green],["Hatchery: Unhatched",S.hUnh,C.pink],
     ["Segregation: Total eggs",S.sgTotal,C.green],["Segregation: Clean",S.sgClean,C.leaf],["Segregation: Minor crack",S.sgMinor,C.amber],["Segregation: Smash",S.sgSmash,C.red],
-    ["Segregation: Small",S.sgSmall,C.grey],["Segregation: Miss shape",S.sgMiss,C.light],["Segregation: Thin shell",S.sgThin,C.pink],["Segregation: Dirty",S.sgDirty,C.blue]
+    ["Segregation: Small",S.sgSmall,C.grey],["Segregation: Miss shape",S.sgMiss,C.light],["Segregation: Thin shell",S.sgThin,C.pink],["Segregation: Dirty",S.sgDirty,C.blue],["Segregation: Extra large",S.sgXl,C.amber]
   ];
   return rows.filter(r=>r[1]!==null && r[1]!==undefined);
 }
@@ -694,7 +694,7 @@ function sampleRecords(ym){
       const set=Math.round(9000+rnd()*1500), inf=Math.round(set*0.08), dam=Math.round(set*0.01), bomb=Math.round(set*0.02), fer=set-inf-dam-bomb, hc=Math.round(fer*(0.84+rnd()*0.06)), mo=Math.round(hc*0.01), cu=Math.round(hc*0.02), dic=Math.round(hc*0.005), sal=hc-mo-cu-dic;
       recs[date].hatchery = { batches:[{batch:String(100+day),eggSet:String(set),time:"08:00",setDate:`${y}-${pad(m)}-${pad(Math.max(1,day-21))}`,transferDate:`${y}-${pad(m)}-${pad(Math.max(1,day-3))}`,hatchDate:date,infertile:String(inf),damage:String(dam),bomb:String(bomb),fertile:String(fer),hatchChicks:String(hc),mortality:String(mo),cull:String(cu),dic:String(dic),salable:String(sal),unhatched:String(fer-hc),fertilePct:Math.round(hc/fer*100)+"%"}] };
     recs[date].segregation = { updated:"2026-01-01T00:00:00.000Z", rows:[0,1,2].map(r=>{ const tot = Math.round(300+rnd()*500), mi = Math.round(rnd()*25), sm = Math.round(rnd()*5), sl = Math.round(rnd()*4), ms = Math.round(rnd()*20), th = Math.round(rnd()*20), di = Math.round(rnd()*15);
-      return { time:["9:00 AM","12:00 PM","4:00 PM"][r], total:String(tot), minor:String(mi), smash:String(sm), small:String(sl), miss:String(ms), thin:String(th), dirty:String(di), clean:String(tot-mi-sm-sl-ms-th-di) }; }) };
+      return { time:["9:00 AM","12:00 PM","4:00 PM"][r], total:String(tot), minor:String(mi), smash:String(sm), small:String(sl), miss:String(ms), thin:String(th), dirty:String(di), xl:"1", clean:String(tot-mi-sm-sl-ms-th-di-1) }; }) };
     }
   }
   return recs;
@@ -790,9 +790,9 @@ function buildMonthlyDoc(days, S, title, graph, fs, trend){
   const sDays = days.filter(d=>d.hasSeg);
   if(sDays.length){
     const ST = k=>fmt(sum(sDays.map(d=>d[k]===undefined?null:d[k])));
-    sections.push({ h:"Egg segregation — daily totals (Segregation app)", head:["Date","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Clean","Clean %"],
-      rows:sDays.map(d=>[niceDate(d.date),E(d.sg_total),E(d.sg_minor),E(d.sg_smash),E(d.sg_small),E(d.sg_miss),E(d.sg_thin),E(d.sg_dirty),E(d.sg_clean),(d.sg_total?fmt((d.sg_clean||0)/d.sg_total*100)+"%":"—")]),
-      foot:["TOTAL",ST("sg_total"),ST("sg_minor"),ST("sg_smash"),ST("sg_small"),ST("sg_miss"),ST("sg_thin"),ST("sg_dirty"),ST("sg_clean"),S.sgPct===null?"—":fmt(S.sgPct)+"%"] });
+    sections.push({ h:"Egg segregation — daily totals (Segregation app)", head:["Date","Total","Minor Crack","Smash","Small","Miss Shape","Thin Shell","Dirty","Extra Large","Clean","Clean %"],
+      rows:sDays.map(d=>[niceDate(d.date),E(d.sg_total),E(d.sg_minor),E(d.sg_smash),E(d.sg_small),E(d.sg_miss),E(d.sg_thin),E(d.sg_dirty),E(d.sg_xl),E(d.sg_clean),(d.sg_total?fmt((d.sg_clean||0)/d.sg_total*100)+"%":"—")]),
+      foot:["TOTAL",ST("sg_total"),ST("sg_minor"),ST("sg_smash"),ST("sg_small"),ST("sg_miss"),ST("sg_thin"),ST("sg_dirty"),ST("sg_xl"),ST("sg_clean"),S.sgPct===null?"—":fmt(S.sgPct)+"%"] });
   }
   const hDays = days.filter(d=>d.hasHatchery && d.hCount);
   const HT = k=>fmt(sum(hDays.map(d=>d[k]===undefined?null:d[k])));
