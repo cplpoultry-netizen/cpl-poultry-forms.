@@ -714,6 +714,11 @@ function sampleRecords(ym){
 // ============================ PDF ============================
 // The Monthly PDF: page 1) summary + graph, then the daily tables, then hatchery, segregation, logs & remarks. Tables carry on to new pages when a page is full, so every entry is printed.
 function cutText(s, n){ s = (s === undefined || s === null || s === "") ? "—" : String(s); return s.length > n ? s.slice(0, n-1) + "…" : s; }
+function birdsTotal(d){
+  if(d.remT!==null && d.remT!==undefined) return d.remT;
+  const m = d.remM===undefined?null:d.remM, f = d.remF===undefined?null:d.remF;
+  return (m===null && f===null) ? null : (m||0)+(f||0);
+}
 function buildMonthlyDoc(days, S, title, graph, fs, trend){
   const doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4", orientation:"portrait" });
   const GREEN = [43,65,39], RED = [179,38,30], M = 24, PAD = 1.1;
@@ -789,9 +794,13 @@ function buildMonthlyDoc(days, S, title, graph, fs, trend){
   }
   let py = newPage("Daily tables");
   py = section(py, "Daily records (eggs, storage, mortality, feed, water)",
-    ["Date","Total Eggs","Hatchery","Table","Smash","Storage Eggs","Mort. Male","Mort. Female","Feed Male kg","Feed Female kg","Water L","Feed Stock kg"],
-    days.map(d=>[niceDate(d.date),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),E(d.eggTotalStore),E(d.mortM),E(d.mortF),E(d.feedM),E(d.feedF),E(d.water),E(d.stockKg)]),
-    ["MONTH TOTAL",T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),T("eggTotalStore"),T("mortM"),T("mortF"),T("feedM"),T("feedF"),T("water"),T("stockKg")]);
+    ["Date","Total Eggs","Hatchery","Table","Smash","Storage Eggs","Mort. Male","Mort. Female","Birds Left Male","Birds Left Female","Birds Left Total","Feed Male kg","Feed Female kg","Water L","Feed Stock kg"],
+    days.map(d=>[niceDate(d.date),E(d.eggTotal),E(d.eggHatchery),E(d.eggTable),E(d.eggSmash),E(d.eggTotalStore),E(d.mortM),E(d.mortF),E(d.remM),E(d.remF),{content:E(birdsTotal(d)),styles:{fontStyle:"bold"}},E(d.feedM),E(d.feedF),E(d.water),E(d.stockKg)]),
+    ["MONTH TOTAL",T("eggTotal"),T("eggHatchery"),T("eggTable"),T("eggSmash"),T("eggTotalStore"),T("mortM"),T("mortF"),fmt(S.remM),fmt(S.remF),fmt(S.remT),T("feedM"),T("feedF"),T("water"),T("stockKg")]);
+  if(py + 6 > bottom) py = newPage(curSub);
+  doc.setFont("helvetica","normal"); doc.setFontSize(6.5); doc.setTextColor(90,90,90);
+  doc.text("Birds Left = birds remaining at the end of that day, after that day's mortalities (from the Daily Operation Checklist). In the MONTH TOTAL row, the Birds Left columns show the latest figures, not a sum.", M, py - 4, {maxWidth:pw()-2*M});
+  doc.setTextColor(0,0,0); py += 6;
   const cl = days.filter(d=>d.hasChecklist);
   if(cl.length){
     py = section(py, "House, Setter & Hatcher environment — daily averages",
