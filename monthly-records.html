@@ -296,7 +296,7 @@ function aggregate(date, rec){
   if(sg && sg.rows){
     d.hasSeg = true;
     ["total","minor","smash","small","miss","thin","dirty","xl","clean"].forEach(k=>{ d["sg_"+k] = sum(sg.rows.map(r=>n(r[k]))); });
-    d.sg_table = sum(["minor","smash","small","miss","thin","dirty","xl"].map(k=>d["sg_"+k]));   // Table eggs = every category except Clean
+    d.sg_table = sum(["minor","small","miss","thin","dirty","xl"].map(k=>d["sg_"+k]));   // Table eggs = every category except Clean and Smash
     // Linked: the Segregation total is the day's Total Eggs (same as the Daily Operation Checklist)
     if(d.sg_total !== null){
       const rt = i => sg.rows[i] ? n(sg.rows[i].total) : null;
@@ -360,7 +360,7 @@ function totalsFor(S){
     ["Hatchery: Egg set",S.hSet,C.green],["Hatchery: Infertile",S.hInf,C.grey],["Hatchery: Damage",S.hDam,C.grey],["Hatchery: Bomb",S.hBomb,C.grey],
     ["Hatchery: Candling fertile",S.hFertile,C.blue],["Hatchery: Hatch chicks",S.hHatch,C.amber],["Hatchery: Chick mortality",S.hMort,C.red],
     ["Hatchery: Cull",S.hCull,C.red],["Hatchery: DIC",S.hDic,C.red],["Hatchery: Salable chicks",S.hSalable,C.green],["Hatchery: Unhatched",S.hUnh,C.pink],
-    ["Segregation: Total eggs",S.sgTotal,C.green],["Segregation: Clean",S.sgClean,C.leaf],["Segregation: Table eggs (all except clean)",S.sgTable,C.amber],["Segregation: Minor crack",S.sgMinor,C.amber],["Segregation: Smash",S.sgSmash,C.red],
+    ["Segregation: Total eggs",S.sgTotal,C.green],["Segregation: Clean",S.sgClean,C.leaf],["Segregation: Table eggs (no clean, no smash)",S.sgTable,C.amber],["Segregation: Minor crack",S.sgMinor,C.amber],["Segregation: Smash",S.sgSmash,C.red],
     ["Segregation: Small",S.sgSmall,C.grey],["Segregation: Miss shape",S.sgMiss,C.light],["Segregation: Thin shell",S.sgThin,C.pink],["Segregation: Dirty",S.sgDirty,C.blue],["Segregation: Extra large",S.sgXl,C.amber]
   ];
   return rows.filter(r=>r[1]!==null && r[1]!==undefined);
@@ -594,7 +594,7 @@ function kpiPairs(S){
     [fmt(S.storeSum),"Storage eggs — all days added up"], [fmt(S.curSum),"Current storage — all days added up"],
     [fmt(S.hBatches),"Hatchery batches"], [fmt(S.hSet),"Eggs set"], [fmt(S.hHatch)+(S.hPct!==null?" ("+fmt(S.hPct)+"%)":""),"Chicks hatched (of fertile)"], [fmt(S.hSalable),"Salable chicks"],
     [fmt(S.sgTotal),"Segregated eggs"], [fmt(S.sgClean)+(S.sgPct!==null?" ("+fmt(S.sgPct)+"%)":""),"Clean eggs (segregation)"],
-    [fmt(S.sgTable)+(S.sgTotal&&S.sgTable!==null?" ("+fmt(S.sgTable/S.sgTotal*100)+"%)":""),"Table eggs (segregation — all except clean)"]
+    [fmt(S.sgTable)+(S.sgTotal&&S.sgTable!==null?" ("+fmt(S.sgTable/S.sgTotal*100)+"%)":""),"Table eggs (segregation, no smash)"]
   ];
 }
 function refresh(){
@@ -835,7 +835,7 @@ function buildMonthlyDoc(days, S, title, graph, fs, trend){
       ["TOTAL",ST("sg_total"),ST("sg_minor"),ST("sg_smash"),ST("sg_small"),ST("sg_miss"),ST("sg_thin"),ST("sg_dirty"),ST("sg_xl"),ST("sg_table"),ST("sg_clean"),S.sgPct===null?"—":fmt(S.sgPct)+"%"]);
     if(py + 6 > bottom) py = newPage(curSub);
     doc.setFont("helvetica","normal"); doc.setFontSize(6.5); doc.setTextColor(90,90,90);
-    doc.text("Table Eggs = Minor Crack + Smash + Small + Miss Shape + Thin Shell + Dirty + Extra Large (every egg that is not Clean).", M, py - 4);
+    doc.text("Table Eggs = Minor Crack + Small + Miss Shape + Thin Shell + Dirty + Extra Large (Smash and Clean eggs are not table eggs).", M, py - 4);
     doc.setTextColor(0,0,0);
   }
   const hDays = days.filter(d=>d.hasHatchery && d.hCount);

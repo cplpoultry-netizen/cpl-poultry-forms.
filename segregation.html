@@ -79,10 +79,10 @@
   </div>
 
   <div class="card">
-    <h2>Table eggs — every egg that is not Clean</h2>
+    <h2>Table eggs — not Clean and not Smash</h2>
     <div class="tblgrid" id="tbl-list"></div>
     <div class="tbltotal"><b id="tbl-total">—</b><span>TOTAL TABLE EGGS (auto)</span></div>
-    <p class="hint">Table Eggs = Minor Crack + Smash + Small + Miss Shape + Thin Shell + Dirty + Extra Large. Clean eggs are not included. This total also goes to the Monthly Records app.</p>
+    <p class="hint">Table Eggs = Minor Crack + Small + Miss Shape + Thin Shell + Dirty + Extra Large. Clean eggs and Smash eggs are not included (smashed eggs cannot be sold as table eggs). This total also goes to the Monthly Records app.</p>
   </div>
 
   <div class="card">
@@ -266,7 +266,7 @@ function fmt(x){ return (x === null || x === undefined) ? "—" : Number(x).toLo
 function readRows(){
   return SLOTS.map((t,r)=>{ const o = { time:t }; COLS.forEach(c=>{ o[c[0]] = document.getElementById("s"+r+"_"+c[0]).value.trim(); }); return o; });
 }
-const TABLE_KEYS = ["minor","smash","small","miss","thin","dirty","xl"];   // every category except Clean
+const TABLE_KEYS = ["minor","small","miss","thin","dirty","xl"];   // every category except Clean and Smash (smashed eggs are not table eggs)
 function tableOf(o){ let s = 0, any = false; TABLE_KEYS.forEach(k=>{ const v = num(o[k]); if(v !== null){ s += v; any = true; } }); return any ? s : null; }
 function columnTotals(rows){
   const T = {}; COLS.forEach(c=>{ let s = 0, any = false; rows.forEach(r=>{ const v = num(r[c[0]]); if(v !== null){ s += v; any = true; } }); T[c[0]] = any ? s : null; });
@@ -283,7 +283,7 @@ function recalc(){
   COLS.forEach(c=>{ document.getElementById("t_"+c[0]).textContent = fmt(T[c[0]]); });
   document.getElementById("t_table").textContent = fmt(T.table);
   rows.forEach((r,i)=>{ document.getElementById("tb"+i).textContent = fmt(tableOf(r)); });
-  document.getElementById("tbl-list").innerHTML = TABLE_KEYS.map(k=>"<div><b>" + fmt(T[k]) + "</b><span>" + COLS.find(c=>c[0]===k)[1] + "</span></div>").join("");
+  document.getElementById("tbl-list").innerHTML = TABLE_KEYS.map(k=>"<div><b>" + fmt(T[k]) + "</b><span>" + COLS.find(c=>c[0]===k)[1] + "</span></div>").join("") + "<div style='background:#fbe9e7;border-color:#e0b4ae'><b>" + fmt(T.smash) + "</b><span>Smash (not table eggs)</span></div>";
   document.getElementById("tbl-total").textContent = fmt(T.table);
   rows.forEach((r,i)=>{
     const d = rowCheck(r), el = document.getElementById("chk"+i);
@@ -295,7 +295,7 @@ function recalc(){
   k.push([fmt(T.total), "Total eggs"]);
   k.push([fmt(T.clean), "Clean eggs"]);
   k.push([(T.total && T.clean !== null) ? (Math.round(T.clean / T.total * 1000) / 10) + "%" : "—", "Clean % of total"]);
-  k.push([fmt(T.table), "Table eggs (all except clean)"]);
+  k.push([fmt(T.table), "Table eggs (no clean, no smash)"]);
   document.getElementById("kpis").innerHTML = k.map(x=>"<div class='kpi'><b>" + x[0] + "</b><span>" + x[1] + "</span></div>").join("");
   return { rows:rows, totals:T };
 }
@@ -396,9 +396,9 @@ function generatePDF(){
     footStyles:{ fillColor:[246,178,107], textColor:[20,20,20], fontStyle:"bold", fontSize:12 },
     columnStyles:{ 0:{ halign:"left", fontStyle:"bold" }, 10:{ fillColor:[253,241,220], fontStyle:"bold" } } });
   let y = doc.lastAutoTable.finalY + 20;
-  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...GREEN); doc.text("Table eggs — every egg that is not Clean", mL, y);
+  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...GREEN); doc.text("Table eggs — not Clean and not Smash", mL, y);
   doc.autoTable({ startY:y+6, margin:{ left:mL, right:mR }, theme:"grid", tableWidth:300,
-    head:[["Category","Eggs"]], body:TABLE_KEYS.map(k=>[COLS.find(c=>c[0]===k)[1], fmt(R.totals[k])]), foot:[["TOTAL TABLE EGGS", fmt(R.totals.table)]], showFoot:"lastPage", rowPageBreak:"avoid",
+    head:[["Category","Eggs"]], body:TABLE_KEYS.map(k=>[COLS.find(c=>c[0]===k)[1], fmt(R.totals[k])]).concat([["Smash (not table eggs)", fmt(R.totals.smash)]]), foot:[["TOTAL TABLE EGGS", fmt(R.totals.table)]], showFoot:"lastPage", rowPageBreak:"avoid",
     styles:{ fontSize:10, cellPadding:5, lineColor:[180,176,160], lineWidth:0.6 }, columnStyles:{ 1:{ halign:"center" } },
     headStyles:{ fillColor:GREEN, textColor:255, fontStyle:"bold" },
     footStyles:{ fillColor:[246,178,107], textColor:[20,20,20], fontStyle:"bold", fontSize:11 } });
@@ -406,7 +406,7 @@ function generatePDF(){
   const T = R.totals, lines = [];
   if(T.total) lines.push("Total eggs segregated: " + fmt(T.total));
   if(T.clean !== null && T.total) lines.push("Clean eggs: " + fmt(T.clean) + " (" + (Math.round(T.clean / T.total * 1000) / 10) + "% of total)");
-  if(T.table !== null && T.total) lines.push("Table eggs (all except clean): " + fmt(T.table) + " (" + (Math.round(T.table / T.total * 1000) / 10) + "% of total)");
+  if(T.table !== null && T.total) lines.push("Table eggs (no clean, no smash): " + fmt(T.table) + " (" + (Math.round(T.table / T.total * 1000) / 10) + "% of total)");
   doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(0,0,0);
   lines.forEach(l=>{ doc.text(l, mL, y); y += 16; });
   doc.setFontSize(8.5); doc.setTextColor(110,110,110);
