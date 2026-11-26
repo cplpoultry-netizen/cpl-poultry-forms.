@@ -42,7 +42,9 @@
 
   var stored = null;
   try{ stored = JSON.parse(localStorage.getItem(KEY)); }catch(e){}
-  if(stored && PW[stored.role] && stored.h === PW[stored.role]) AUTH.role = stored.role;
+  var MAX_AGE = 24*60*60*1000;   // everyone is logged out 24 hours after they signed in
+  function fresh(st){ return st && typeof st.t === "number" && (Date.now() - st.t) < MAX_AGE && st.t <= Date.now() + 60000; }
+  if(stored && PW[stored.role] && stored.h === PW[stored.role] && fresh(stored)) AUTH.role = stored.role;
 
   function logout(){ try{ localStorage.removeItem(KEY); }catch(e){} location.reload(); }
   AUTH.logout = logout;
@@ -69,7 +71,7 @@
         var h = hashPw(inp.value), role = null;
         ["admin","coworker","viewer"].forEach(function(r){ if(!role && PW[r] && PW[r] === h) role = r; });
         if(!role){ document.getElementById("cpl-gate-msg").textContent = "Wrong password. Try again."; inp.value = ""; return; }
-        try{ localStorage.setItem(KEY, JSON.stringify({ role:role, h:h })); }catch(e){}
+        try{ localStorage.setItem(KEY, JSON.stringify({ role:role, h:h, t:Date.now() })); }catch(e){}
         location.reload();
       });
     });
@@ -78,6 +80,10 @@
 
   // ---------------- signed in ----------------
   var role = AUTH.role;
+  // while a page is left open, check once a minute and when the phone wakes up
+  function checkExpiry(){ var st = null; try{ st = JSON.parse(localStorage.getItem(KEY)); }catch(e){} if(!fresh(st)) logout(); }
+  setInterval(checkExpiry, 60000);
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) checkExpiry(); });
   document.addEventListener("DOMContentLoaded", function(){
     // small badge with log out
     var b = document.createElement("div");

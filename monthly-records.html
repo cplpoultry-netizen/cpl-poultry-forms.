@@ -586,7 +586,38 @@ function combinedImage(S){
 
 // ============================ SCREEN ============================
 function currentMonth(){ return document.getElementById("month").value; }
-function kpi(val,label){ return `<div class="kpi"><b>${val}</b><span>${label}</span></div>`; }
+function kpi(val,label){
+  const can = window.CPL_AUTH && CPL_AUTH.can("days") && KPI_DAY[label];
+  return `<div class="kpi"${can?` data-kpi="${label.replace(/"/g,"&quot;")}" style="cursor:pointer;" title="Tap to see each date"`:""}><b>${val}</b><span>${label}${can?" ▸":""}</span></div>`;
+}
+// Tap a summary box to see the figure for each individual date (Co-worker and Administrator only)
+const KPI_DAY = {
+  "Days recorded":d=>"✔", "Total eggs":d=>d.eggTotal, "Average eggs per day":d=>d.eggTotal, "Hatchery eggs":d=>d.eggHatchery,
+  "Table eggs":d=>d.eggTable, "Smash eggs":d=>d.eggSmash, "Total mortality":d=>d.mortT,
+  "Male / Female mortality":d=>(d.mortM===null||d.mortM===undefined)?null:fmt(d.mortM)+" M / "+fmt(d.mortF)+" F",
+  "Total birds remaining (Male + Female)":d=>d.remT, "Male birds remaining (latest)":d=>d.remM, "Female birds remaining (latest)":d=>d.remF,
+  "Feed given (kg)":d=>d.feedT, "Water (litres)":d=>d.water, "Feed stock recorded (kg)":d=>d.stockKg,
+  "Storage eggs — all days added up":d=>d.eggTotalStore, "Current storage — all days added up":d=>d.eggStore,
+  "Hatchery batches":d=>d.hCount, "Eggs set":d=>d.h_eggSet, "Chicks hatched (of fertile)":d=>d.h_hatchChicks, "Salable chicks":d=>d.h_salable,
+  "Segregated eggs":d=>d.sg_total, "Clean eggs (segregation)":d=>d.sg_clean, "Table eggs (segregation, no smash)":d=>d.sg_table
+};
+let _shownDays = [];
+function showKpiDays(label){
+  const f = KPI_DAY[label]; if(!f) return;
+  let rows = "", any = false;
+  _shownDays.forEach(d=>{
+    let v = f(d); if(v === undefined || v === null || v === "") v = "—"; else { any = true; if(typeof v === "number") v = fmt(v); }
+    rows += `<tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">${niceDate(d.date)}</td><td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;">${v}</td></tr>`;
+  });
+  const m = document.createElement("div");
+  m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100001;display:flex;align-items:center;justify-content:center;padding:14px;";
+  m.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;border-top:5px solid #c98a2c;">
+    <div style="padding:12px 14px;font-weight:800;color:#2b4127;">${label}<div style="font-weight:400;font-size:12px;color:#6a6a5e;">Each recorded date in ${monthTitle(currentMonth())}</div></div>
+    <div style="overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:14px;">${rows || '<tr><td style="padding:12px;">No dates recorded.</td></tr>'}</table></div>
+    <button style="margin:10px;border:0;border-radius:8px;padding:11px;font-size:14px;font-weight:700;background:#2b4127;color:#fff;">Close</button></div>`;
+  m.addEventListener("click", e=>{ if(e.target === m || e.target.tagName === "BUTTON") m.remove(); });
+  document.body.appendChild(m);
+}
 function kpiPairs(S){
   return [
     [S.count,"Days recorded"], [fmt(S.eggs),"Total eggs"], [fmt(S.avgEggs),"Average eggs per day"],
@@ -608,6 +639,8 @@ function refresh(){
   document.getElementById("btn-pdf").disabled = days.length===0;
   document.getElementById("pdf-hint").textContent = days.length ? ("The PDF will contain "+days.length+" recorded day(s) for "+monthTitle(ym)+(SAMPLE?" (SAMPLE DATA).":".")) : "No records saved for this month yet. Fill in the Daily Operation Checklist (with a Date) and it will appear here automatically.";
   document.getElementById("kpis").innerHTML = days.length ? kpiPairs(S).map(k=>kpi(k[0],k[1])).join("") : '<div class="nodata" style="grid-column:1/-1;">Nothing to summarise yet.</div>';
+  _shownDays = days;
+  document.querySelectorAll("#kpis .kpi[data-kpi]").forEach(el=>{ el.onclick = ()=>showKpiDays(el.getAttribute("data-kpi")); });
   renderCharts(S);
   renderTrend(ym);
   const t = document.getElementById("days-table");
