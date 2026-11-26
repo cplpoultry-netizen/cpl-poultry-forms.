@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="passwords.js"></script>
+<script src="auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Poultry Records</title>
@@ -79,7 +81,7 @@
     <div class="charts" id="trend-box"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="days-card">
     <h2>Days recorded</h2>
     <div style="overflow-x:auto;"><table class="days" id="days-table"></table></div>
   </div>
@@ -112,7 +114,7 @@
     </details>
   </div>
 
-  <div class="card">
+  <div class="card" id="backup-card">
     <h2>Backup (important)</h2>
     <p class="hint" style="margin-top:0;">Your records live only inside this browser on this device. If you clear the browser data or change phones, they are gone. Download a backup file once a month and keep it safe (e.g. email it to yourself).</p>
     <div class="btns">
@@ -615,7 +617,7 @@ function refresh(){
     const tr = document.createElement("tr");
     [niceDate(d.date), d.hasChecklist?"✔":"—", d.hasFeedStock?"✔":"—", d.hasHatchery?"✔":"—", fmt(d.eggTotal===undefined?null:d.eggTotal), fmt(d.eggTotalStore===undefined?null:d.eggTotalStore), fmt(d.mortT===undefined?null:d.mortT), fmt(d.sg_total===undefined?null:d.sg_total), fmt(d.sg_table===undefined?null:d.sg_table)].forEach(x=>{ const td=document.createElement("td"); td.textContent=x; tr.appendChild(td); });
     const td = document.createElement("td");
-    if(!SAMPLE){ const b=document.createElement("button"); b.className="danger"; b.textContent="Delete"; b.style.padding="4px 8px"; b.onclick=()=>deleteDay(d.date); td.appendChild(b); }
+    if(!SAMPLE && window.CPL_AUTH && CPL_AUTH.can("delete")){ const b=document.createElement("button"); b.className="danger"; b.textContent="Delete"; b.style.padding="4px 8px"; b.onclick=()=>deleteDay(d.date); td.appendChild(b); }
     tr.appendChild(td); tb.appendChild(tr);
   });
   if(days.length){

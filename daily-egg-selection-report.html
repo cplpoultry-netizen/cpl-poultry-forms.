@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="passwords.js"></script>
+<script src="auth.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Egg Selection Report — CPL Poultry</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --danger:#a33b2b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:17px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
+  .wrap{max-width:760px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
+  }
+  .card h2{
+    font-size:13.5px;
+    margin:0 0 10px;
+    color:#fff;
+    background:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:110px;}
+  label{
+    display:block;
+    font-size:11.5px;
+    color:#5a5a4f;
+    margin-bottom:3px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+  }
+  input, select, textarea{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:600;
+    font-family:inherit;
+  }
+  textarea{ font-weight:500; resize:vertical; min-height:60px; }
+  input:focus, select:focus, textarea:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  table.grid{ width:100%; border-collapse:collapse; font-size:12px; }
+  table.grid th{
+    background:var(--green-dark);
+    color:#fff;
+    padding:6px 4px;
+    font-size:10px;
+    font-weight:700;
+    text-align:center;
+    border:1px solid var(--green-dark);
+    border-bottom:2px solid var(--amber);
+  }
+  table.grid td{ border:1px solid var(--line); padding:3px; text-align:center; }
+  table.grid td input{
+    padding:5px 3px;
+    font-size:12px;
+    text-align:center;
+    min-width:44px;
+    font-weight:600;
+  }
+  table.grid td.rowlabel{
+    text-align:left;
+    font-weight:700;
+    font-size:11.5px;
+    padding-left:6px;
+    white-space:nowrap;
+    background:#f7f5ef;
+    color:var(--green-dark);
+  }
+  tr.total-row td{ background:#f0efe8; font-weight:800; }
+  tr.total-row td input{ background:#f0efe8; color:var(--green-dark); font-weight:800; }
+  td.computed-cell input{ background:#fbeceb; color:var(--danger); font-weight:800; }
+  .scroll-x{overflow-x:auto;padding-bottom:4px;}
+  .status-btns{display:flex;gap:4px;justify-content:center;}
+  .status-btns button{
+    border:1px solid var(--line);
+    background:#fff;
+    padding:4px 6px;
+    font-size:10px;
+    border-radius:5px;
+  }
+  .status-btns button.active-ok{background:var(--green);color:#fff;border-color:var(--green);}
+  .status-btns button.active-bad{background:var(--danger);color:#fff;border-color:var(--danger);}
+  .add-row{
+    margin-top:8px;
+    background:none;
+    border:1px dashed var(--green);
+    color:var(--green-dark);
+    padding:6px 10px;
+    border-radius:6px;
+    font-size:12px;
+    font-weight:600;
+  }
+  .toggle-btn{
+    flex:1;
+    min-width:150px;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:9px 10px;
+    border-radius:6px;
+    font-size:12px;
+    font-weight:700;
+  }
+  .sig-box{
+    margin-top:8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    min-height:64px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:6px;
+  }
+  .sig-box img{ max-width:100%; max-height:60px; display:none; }
+  .sig-box img[src]:not([src=""]){ display:block; }
+  .sig-controls{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+  .sig-upload-btn, .sig-draw-btn{
+    flex:1;
+    min-width:100px;
+    text-align:center;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:7px 8px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .sig-draw-btn{ background:var(--amber); }
+  .sig-clear-btn{
+    background:none;
+    border:1px solid var(--danger);
+    color:var(--danger);
+    padding:7px 10px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+  }
+  .sigpad-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+  }
+  .sigpad-overlay.open{ display:flex; }
+  .sigpad-box{
+    background:#fff;
+    border-radius:10px;
+    padding:14px;
+    width:100%;
+    max-width:420px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.3);
+  }
+  .sigpad-box h3{ margin:0 0 10px; font-size:13px; color:var(--green-dark); text-transform:uppercase; letter-spacing:.4px; }
+  .sigpad-canvas-wrap{ border:2px dashed var(--line); border-radius:8px; background:#fff; touch-action:none; }
+  #sigpad-canvas{ width:100%; height:180px; display:block; background:#fff; border-radius:6px; }
+  .sigpad-hint{ font-size:11px; color:#7a7a6d; margin:8px 0; }
+  .sigpad-actions{ display:flex; gap:8px; margin-top:6px; }
+  .sigpad-actions button{ flex:1; padding:10px; border-radius:8px; border:none; font-size:13px; font-weight:700; }
+  .sigpad-save{ background:var(--amber); color:#fff; }
+  .sigpad-clear{ background:var(--green-dark); color:#fff; }
+  .sigpad-cancel{ background:none; border:1px solid var(--line); color:var(--ink); }
+  .unit-field{ display:flex; align-items:center; gap:4px; justify-content:center; }
+  .unit-field input{ min-width:44px; }
+  .unit-field .unit-suffix{ font-size:10.5px; font-weight:700; color:var(--green-dark); white-space:nowrap; }
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{background:var(--amber);color:#fff;}
+  .btn-secondary{background:var(--green-dark);color:#fff;}
+  .hint{font-size:11px;color:#7a7a6d;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Daily Egg Selection Report</h1>
+  <p>CPL Coconut Products Limited — Poultry Division</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Report Details</h2>
+    <div class="row">
+      <div class="field"><label>Flock</label><input type="text" id="f-flock" placeholder="e.g. Flock 3"></div>
+      <div class="field"><label>HH %</label><input type="number" id="f-hh" step="0.01" placeholder="%"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Average Egg Weight (g)</label><input type="number" id="f-avgweight" step="0.1"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Egg Selection</h2>
+    <div class="scroll-x">
+      <table class="grid" id="eggsel-table">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Production<br>Egg</th>
+            <th>Hatching<br>Egg</th>
+            <th>Floor<br>Egg</th>
+            <th>Junior<br>Egg</th>
+            <th>Jumbo<br>Egg</th>
+            <th>Dirty<br>Egg</th>
+            <th>Crack<br>Egg</th>
+            <th>Damage<br>Egg</th>
+            <th>Abnormal<br>Egg</th>
+            <th>Total<br>Non-HE</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr class="total-row" id="eggsel-total-row">
+            <td class="rowlabel">Total</td>
+            <td><input type="number" id="eggsel-tot-production" readonly></td>
+            <td><input type="number" id="eggsel-tot-hatching" readonly></td>
+            <td><input type="number" id="eggsel-tot-floor" readonly></td>
+            <td><input type="number" id="eggsel-tot-junior" readonly></td>
+            <td><input type="number" id="eggsel-tot-jumbo" readonly></td>
+            <td><input type="number" id="eggsel-tot-dirty" readonly></td>
+            <td><input type="number" id="eggsel-tot-crack" readonly></td>
+            <td><input type="number" id="eggsel-tot-damage" readonly></td>
+            <td><input type="number" id="eggsel-tot-abnormal" readonly></td>
+            <td><input type="number" id="eggsel-tot-nonhe" readonly style="color:#b3261e;"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button class="add-row" onclick="addEggSelRow()">+ Add row</button>
+    <p class="hint">Total Non-HE = Floor + Junior + Jumbo + Dirty + Crack + Damage + Abnormal eggs, calculated automatically.</p>
+  </div>
+
+  <div class="card">
+    <h2>Male Specialist</h2>
+    <div class="scroll-x">
+      <table class="grid">
+        <thead><tr><th>Pan</th><th>A</th><th>B</th><th>C</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><input type="number" id="ms-pan"></td>
+            <td><input type="number" id="ms-a"></td>
+            <td><input type="number" id="ms-b"></td>
+            <td><input type="number" id="ms-c"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">Male Replaced — Pan / A / B / C counts.</p>
+  </div>
+
+  <div class="card">
+    <h2>Parent Stock Depletion</h2>
+    <div class="scroll-x">
+      <table class="grid">
+        <thead><tr><th></th><th>Female</th><th>Male</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="rowlabel">Balance b/f</td>
+            <td><input type="number" id="psd-bal-f" oninput="updatePSD()"></td>
+            <td><input type="number" id="psd-bal-m" oninput="updatePSD()"></td>
+          </tr>
+          <tr>
+            <td class="rowlabel">Culling</td>
+            <td><input type="number" id="psd-cull-f" oninput="updatePSD()"></td>
+            <td><input type="number" id="psd-cull-m" oninput="updatePSD()"></td>
+          </tr>
+          <tr>
+            <td class="rowlabel">Death</td>
+            <td><input type="number" id="psd-death-f" oninput="updatePSD()"></td>
+            <td><input type="number" id="psd-death-m" oninput="updatePSD()"></td>
+          </tr>
+          <tr>
+            <td class="rowlabel">Remaining (auto)</td>
+            <td class="computed-cell"><input type="number" id="psd-rem-f" readonly></td>
+            <td class="computed-cell"><input type="number" id="psd-rem-m" readonly></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">Remaining = Balance b/f − Culling − Death, calculated automatically.</p>
+  </div>
+
+  <div class="card">
+    <h2>Feed Usage</h2>
+    <div class="scroll-x">
+      <table class="grid" id="feedusage-table">
+        <thead><tr><th>Code</th><th>Female (kg)</th><th>Male (kg)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="add-row" onclick="addFeedUsageRow()">+ Add code</button>
+  </div>
+
+  <div class="card">
+    <h2>Equipment Report</h2>
+    <div class="row" style="margin-bottom:10px;">
+      <button type="button" class="toggle-btn" id="toggle-equip-btn" onclick="toggleAllEquipOk()">Toggle All OK / Faulty: OK</button>
+    </div>
+    <div class="scroll-x">
+      <table class="grid" id="equip-table">
+        <thead><tr><th>Item</th><th>OK / Faulty</th><th>Remarks</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div class="field">
+        <label>Temp at 1:30PM — Infront (°C)</label>
+        <input type="number" step="0.1" id="eq-temp-infront">
+      </div>
+      <div class="field">
+        <label>Temp at 1:30PM — Middle (°C)</label>
+        <input type="number" step="0.1" id="eq-temp-middle">
+      </div>
+      <div class="field">
+        <label>Temp at 1:30PM — Behind (°C)</label>
+        <input type="number" step="0.1" id="eq-temp-behind">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Feeding Time — From</label><input type="time" id="eq-feed-from"></div>
+      <div class="field"><label>Feeding Time — To</label><input type="time" id="eq-feed-to"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Water Meter 4:30PM — Before</label><input type="number" step="0.1" id="eq-water-before" oninput="updateWaterConsumed()"></div>
+      <div class="field"><label>Water Meter 4:30PM — After</label><input type="number" step="0.1" id="eq-water-after" oninput="updateWaterConsumed()"></div>
+      <div class="field"><label>Consumed (auto)</label><input type="number" id="eq-water-consumed" readonly style="background:#fbeceb;color:#a33b2b;font-weight:800;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Remarks</h2>
+    <textarea id="f-remarks" rows="3" placeholder="General remarks..."></textarea>
+    <p class="hint" style="margin-top:10px;">Weight Range Tally</p>
+    <div class="scroll-x">
+      <table class="grid" id="weighttally-table">
+        <thead><tr><th>Range (g)</th><th>Count</th></tr></thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td class="rowlabel">Total</td>
+            <td><input type="number" id="weighttally-total" readonly></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button class="add-row" onclick="addWeightTallyRow()">+ Add range</button>
+  </div>
+
+  <div class="card">
+    <h2>Checked By</h2>
+    <div class="row">
+      <div class="field"><label>Supervisor Name</label><input type="text" id="f-supervisor" placeholder="e.g. Robert. W"></div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Supervisor Signature</label>
+        <div class="sig-box" id="sig-supervisor-box">
+          <img id="sig-supervisor-img" alt="Supervisor Signature">
+        </div>
+        <div class="sig-controls">
+          <label class="sig-upload-btn">
+            Change Signature
+            <input type="file" accept="image/*" style="display:none;" onchange="handleSignatureUpload(event)">
+          </label>
+          <button type="button" class="sig-draw-btn" onclick="openSignaturePad()">Draw Signature</button>
+          <button type="button" class="sig-clear-btn" onclick="clearSignature()">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">Fill in only the fields you have data for — blanks stay blank on the PDF, just like the paper form.</p>
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<div class="sigpad-overlay" id="sigpad-overlay">
+  <div class="sigpad-box">
+    <h3>Draw Your Signature</h3>
+    <div class="sigpad-canvas-wrap">
+      <canvas id="sigpad-canvas"></canvas>
+    </div>
+    <p class="sigpad-hint">Use your finger or mouse to draw. Tap Save when you're happy with it.</p>
+    <div class="sigpad-actions">
+      <button type="button" class="sigpad-cancel" onclick="closeSignaturePad()">Cancel</button>
+      <button type="button" class="sigpad-clear" onclick="clearSignaturePad()">Clear</button>
+      <button type="button" class="sigpad-save" onclick="saveSignaturePad()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ---- Signature handling (Checked By section) ----
+// Robby's signature is embedded by default for Supervisor Signature. Fully editable — upload a different image or clear it anytime.
+const DEFAULT_SUPERVISOR_SIGNATURE = "data:image/png;base64,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";
+let supervisorSignature = DEFAULT_SUPERVISOR_SIGNATURE;
+
+function refreshSignatureImage(){
+  const img = document.getElementById("sig-supervisor-img");
+  if(img) img.src = supervisorSignature || "";
+}
+
+function handleSignatureUpload(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    supervisorSignature = e.target.result;
+    refreshSignatureImage();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSignature(){
+  supervisorSignature = "";
+  refreshSignatureImage();
+}
+
+// ---- Draw-your-own-signature pad ----
+let sigPadDrawing = false;
+let sigPadHasStrokes = false;
+let sigPadCtx = null;
+
+function openSignaturePad(){
+  sigPadHasStrokes = false;
+  document.getElementById("sigpad-overlay").classList.add("open");
+  setupSignaturePadCanvas();
+}
+
+function closeSignaturePad(){
+  document.getElementById("sigpad-overlay").classList.remove("open");
+}
+
+function setupSignaturePadCanvas(){
+  const canvas = document.getElementById("sigpad-canvas");
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(2, 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1a1a1a";
+  sigPadCtx = ctx;
+
+  function getPos(e){
+    const r = canvas.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    return { x: point.clientX - r.left, y: point.clientY - r.top };
+  }
+
+  function start(e){
+    e.preventDefault();
+    sigPadDrawing = true;
+    sigPadHasStrokes = true;
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+  function move(e){
+    if(!sigPadDrawing) return;
+    e.preventDefault();
+    const p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+  function end(e){ sigPadDrawing = false; }
+
+  canvas.onmousedown = start;
+  canvas.onmousemove = move;
+  window.onmouseup = end;
+  canvas.ontouchstart = start;
+  canvas.ontouchmove = move;
+  canvas.ontouchend = end;
+}
+
+function clearSignaturePad(){
+  if(!sigPadCtx) return;
+  const canvas = document.getElementById("sigpad-canvas");
+  const rect = canvas.getBoundingClientRect();
+  sigPadCtx.fillStyle = "#ffffff";
+  sigPadCtx.fillRect(0, 0, rect.width, rect.height);
+  sigPadHasStrokes = false;
+}
+
+function saveSignaturePad(){
+  if(!sigPadHasStrokes){
+    alert("Draw a signature first, or tap Cancel.");
+    return;
+  }
+  const canvas = document.getElementById("sigpad-canvas");
+  supervisorSignature = canvas.toDataURL("image/png");
+  refreshSignatureImage();
+  closeSignaturePad();
+}
+
+// ---- Egg Selection table ----
+let eggSelRowCount = 0;
+function addEggSelRow(){
+  const tbody = document.querySelector("#eggsel-table tbody");
+  const i = eggSelRowCount++;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td class="rowlabel">${i+1}</td>
+    <td><input type="number" data-eggsel="production" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="hatching" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="floor" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="junior" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="jumbo" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="dirty" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="crack" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="damage" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td><input type="number" data-eggsel="abnormal" data-i="${i}" oninput="updateEggSelRow(${i})"></td>
+    <td class="computed-cell"><input type="number" data-eggsel="nonhe" data-i="${i}" readonly></td>
+  `;
+  tbody.appendChild(tr);
+}
+function eggSelVal(field, i){
+  const el = document.querySelector(`[data-eggsel="${field}"][data-i="${i}"]`);
+  return el ? (parseFloat(el.value) || 0) : 0;
+}
+function updateEggSelRow(i){
+  const nonhe = eggSelVal("floor",i) + eggSelVal("junior",i) + eggSelVal("jumbo",i) + eggSelVal("dirty",i) + eggSelVal("crack",i) + eggSelVal("damage",i) + eggSelVal("abnormal",i);
+  const nonheEl = document.querySelector(`[data-eggsel="nonhe"][data-i="${i}"]`);
+  if(nonheEl) nonheEl.value = nonhe || "";
+  updateEggSelTotals();
+}
+function updateEggSelTotals(){
+  const fields = ["production","hatching","floor","junior","jumbo","dirty","crack","damage","abnormal","nonhe"];
+  const sums = {};
+  fields.forEach(f=>{
+    let s = 0;
+    document.querySelectorAll(`[data-eggsel="${f}"]`).forEach(el=>{ s += parseFloat(el.value) || 0; });
+    sums[f] = s;
+  });
+  document.getElementById("eggsel-tot-production").value = sums.production || "";
+  document.getElementById("eggsel-tot-hatching").value = sums.hatching || "";
+  document.getElementById("eggsel-tot-floor").value = sums.floor || "";
+  document.getElementById("eggsel-tot-junior").value = sums.junior || "";
+  document.getElementById("eggsel-tot-jumbo").value = sums.jumbo || "";
+  document.getElementById("eggsel-tot-dirty").value = sums.dirty || "";
+  document.getElementById("eggsel-tot-crack").value = sums.crack || "";
+  document.getElementById("eggsel-tot-damage").value = sums.damage || "";
+  document.getElementById("eggsel-tot-abnormal").value = sums.abnormal || "";
+  document.getElementById("eggsel-tot-nonhe").value = sums.nonhe || "";
+}
+
+// ---- Parent Stock Depletion ----
+function updatePSD(){
+  const balF = parseFloat(document.getElementById("psd-bal-f").value) || 0;
+  const cullF = parseFloat(document.getElementById("psd-cull-f").value) || 0;
+  const deathF = parseFloat(document.getElementById("psd-death-f").value) || 0;
+  document.getElementById("psd-rem-f").value = balF - cullF - deathF;
+
+  const balM = parseFloat(document.getElementById("psd-bal-m").value) || 0;
+  const cullM = parseFloat(document.getElementById("psd-cull-m").value) || 0;
+  const deathM = parseFloat(document.getElementById("psd-death-m").value) || 0;
+  document.getElementById("psd-rem-m").value = balM - cullM - deathM;
+}
+
+// ---- Feed Usage ----
+let feedUsageRowCount = 0;
+function addFeedUsageRow(){
+  const tbody = document.querySelector("#feedusage-table tbody");
+  const i = feedUsageRowCount++;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="text" data-feedusage-code="${i}"></td>
+    <td><input type="number" data-feedusage-female="${i}"></td>
+    <td><input type="number" data-feedusage-male="${i}"></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+// ---- Equipment Report ----
+const equipItems = [
+  "Nipper Drinker","Chain Feeder","Pan Feeder","Feeder System (Hopper, Motor, etc)",
+  "Nest Box","Light Bulb","Emergency Curtain","Cooling Pad","Fans"
+];
+let equipAllOk = true;
+function buildEquipTable(){
+  const tbody = document.querySelector("#equip-table tbody");
+  tbody.innerHTML = "";
+  equipItems.forEach((name,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="rowlabel">${name}</td>
+      <td class="status-btns">
+        <button type="button" class="active-ok" data-equip-ok="${i}" onclick="setEquipOk(${i},true)">OK</button>
+        <button type="button" data-equip-ok-btn="${i}" onclick="setEquipOk(${i},false)">Faulty</button>
+      </td>
+      <td><input type="text" data-equip-remarks="${i}"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+function setEquipOk(i, ok){
+  const okBtn = document.querySelector(`[data-equip-ok="${i}"]`);
+  const faultyBtn = document.querySelector(`[data-equip-ok-btn="${i}"]`);
+  if(ok){
+    okBtn.classList.add("active-ok"); okBtn.classList.remove("active-bad");
+    faultyBtn.classList.remove("active-bad");
+  }else{
+    okBtn.classList.remove("active-ok");
+    faultyBtn.classList.add("active-bad");
+  }
+  okBtn.dataset.val = ok ? "OK" : "Faulty";
+  faultyBtn.dataset.val = ok ? "OK" : "Faulty";
+}
+function toggleAllEquipOk(){
+  equipAllOk = !equipAllOk;
+  equipItems.forEach((name,i)=> setEquipOk(i, equipAllOk));
+  document.getElementById("toggle-equip-btn").textContent = `Toggle All OK / Faulty: ${equipAllOk ? "OK" : "Faulty"}`;
+}
+function getEquipStatus(i){
+  const okBtn = document.querySelector(`[data-equip-ok="${i}"]`);
+  return okBtn && okBtn.classList.contains("active-ok") ? "OK" : "Faulty";
+}
+
+function updateWaterConsumed(){
+  const before = parseFloat(document.getElementById("eq-water-before").value) || 0;
+  const after = parseFloat(document.getElementById("eq-water-after").value) || 0;
+  document.getElementById("eq-water-consumed").value = (after - before) || "";
+}
+
+// ---- Weight Range Tally ----
+let weightTallyRowCount = 0;
+function addWeightTallyRow(){
+  const tbody = document.querySelector("#weighttally-table tbody");
+  const i = weightTallyRowCount++;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="text" data-wt-range="${i}" placeholder="e.g. 40-44"></td>
+    <td><input type="number" data-wt-count="${i}" oninput="updateWeightTallyTotal()"></td>
+  `;
+  tbody.appendChild(tr);
+}
+function updateWeightTallyTotal(){
+  let total = 0;
+  document.querySelectorAll('[data-wt-count]').forEach(el=>{ total += parseFloat(el.value) || 0; });
+  document.getElementById("weighttally-total").value = total || "";
+}
+
+// ---- Setup ----
+for(let i=0;i<5;i++) addEggSelRow();
+for(let i=0;i<3;i++) addFeedUsageRow();
+buildEquipTable();
+equipItems.forEach((name,i)=> setEquipOk(i, true));
+for(let i=0;i<4;i++) addWeightTallyRow();
+refreshSignatureImage();
+
+// ---- Collect data ----
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,dd] = d.split("-");
+  return `${dd}/${m}/${y}`;
+}
+
+function collectData(){
+  const eggsel = [];
+  for(let i=0;i<eggSelRowCount;i++){
+    eggsel.push({
+      no: i+1,
+      production: eggSelVal("production",i), hatching: eggSelVal("hatching",i),
+      floor: eggSelVal("floor",i), junior: eggSelVal("junior",i), jumbo: eggSelVal("jumbo",i),
+      dirty: eggSelVal("dirty",i), crack: eggSelVal("crack",i), damage: eggSelVal("damage",i),
+      abnormal: eggSelVal("abnormal",i), nonhe: eggSelVal("nonhe",i),
+    });
+  }
+  const feedUsage = [];
+  for(let i=0;i<feedUsageRowCount;i++){
+    const code = document.querySelector(`[data-feedusage-code="${i}"]`)?.value || "";
+    const female = document.querySelector(`[data-feedusage-female="${i}"]`)?.value || "";
+    const male = document.querySelector(`[data-feedusage-male="${i}"]`)?.value || "";
+    if(code || female || male) feedUsage.push({code,female,male});
+  }
+  const equip = equipItems.map((name,i)=>({
+    name, status: getEquipStatus(i),
+    remarks: document.querySelector(`[data-equip-remarks="${i}"]`)?.value || "",
+  }));
+  const weightTally = [];
+  for(let i=0;i<weightTallyRowCount;i++){
+    const range = document.querySelector(`[data-wt-range="${i}"]`)?.value || "";
+    const count = document.querySelector(`[data-wt-count="${i}"]`)?.value || "";
+    if(range || count) weightTally.push({range,count});
+  }
+  return {
+    flock: document.getElementById("f-flock").value,
+    hh: document.getElementById("f-hh").value,
+    date: document.getElementById("f-date").value,
+    avgWeight: document.getElementById("f-avgweight").value,
+    eggsel,
+    eggselTotals: {
+      production: document.getElementById("eggsel-tot-production").value,
+      hatching: document.getElementById("eggsel-tot-hatching").value,
+      floor: document.getElementById("eggsel-tot-floor").value,
+      junior: document.getElementById("eggsel-tot-junior").value,
+      jumbo: document.getElementById("eggsel-tot-jumbo").value,
+      dirty: document.getElementById("eggsel-tot-dirty").value,
+      crack: document.getElementById("eggsel-tot-crack").value,
+      damage: document.getElementById("eggsel-tot-damage").value,
+      abnormal: document.getElementById("eggsel-tot-abnormal").value,
+      nonhe: document.getElementById("eggsel-tot-nonhe").value,
+    },
+    msPan: document.getElementById("ms-pan").value,
+    msA: document.getElementById("ms-a").value,
+    msB: document.getElementById("ms-b").value,
+    msC: document.getElementById("ms-c").value,
+    psdBalF: document.getElementById("psd-bal-f").value, psdBalM: document.getElementById("psd-bal-m").value,
+    psdCullF: document.getElementById("psd-cull-f").value, psdCullM: document.getElementById("psd-cull-m").value,
+    psdDeathF: document.getElementById("psd-death-f").value, psdDeathM: document.getElementById("psd-death-m").value,
+    psdRemF: document.getElementById("psd-rem-f").value, psdRemM: document.getElementById("psd-rem-m").value,
+    feedUsage,
+    equip,
+    eqTempInfront: document.getElementById("eq-temp-infront").value,
+    eqTempMiddle: document.getElementById("eq-temp-middle").value,
+    eqTempBehind: document.getElementById("eq-temp-behind").value,
+    eqFeedFrom: document.getElementById("eq-feed-from").value,
+    eqFeedTo: document.getElementById("eq-feed-to").value,
+    eqWaterBefore: document.getElementById("eq-water-before").value,
+    eqWaterAfter: document.getElementById("eq-water-after").value,
+    eqWaterConsumed: document.getElementById("eq-water-consumed").value,
+    remarks: document.getElementById("f-remarks").value,
+    weightTally,
+    supervisor: document.getElementById("f-supervisor").value,
+  };
+}
+
+// ---- PDF generation ----
+function imageFormatFromDataUrl(dataUrl){
+  if(!dataUrl) return "JPEG";
+  if(dataUrl.indexOf("image/png") !== -1) return "PNG";
+  if(dataUrl.indexOf("image/webp") !== -1) return "WEBP";
+  return "JPEG";
+}
+
+function generatePDF(){
+  const d = collectData();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const marginL = 30;
+  let pageW = doc.internal.pageSize.getWidth();
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("CPL COCONUT PRODUCTS LIMITED — POULTRY DIVISION", pageW/2, 24, {align:"center"});
+  doc.setFontSize(11.5);
+  doc.text("DAILY EGG SELECTION REPORT", pageW/2, 39, {align:"center"});
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(marginL, 46, pageW - marginL, 46);
+  doc.setTextColor(0,0,0);
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Flock: ${d.flock || "_____"}`, marginL, 60);
+  doc.text(`HH %: ${d.hh || "_____"}`, marginL+150, 60);
+  doc.text(`Date: ${fmtDate(d.date) || "_____"}`, marginL+260, 60);
+  doc.text(`Average Egg Weight: ${d.avgWeight || "_____"} g`, marginL+380, 60);
+
+  let y = 72;
+
+  doc.autoTable({
+    startY: y,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:7.5, cellPadding:2.5, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["No.","Production\nEgg","Hatching\nEgg","Floor\nEgg","Junior\nEgg","Jumbo\nEgg","Dirty\nEgg","Crack\nEgg","Damage\nEgg","Abnormal\nEgg","Total\nNon-HE"]],
+    body: [
+      ...d.eggsel.map(r=>[r.no,r.production,r.hatching,r.floor,r.junior,r.jumbo,r.dirty,r.crack,r.damage,r.abnormal,r.nonhe]),
+      ["Total", d.eggselTotals.production, d.eggselTotals.hatching, d.eggselTotals.floor, d.eggselTotals.junior, d.eggselTotals.jumbo, d.eggselTotals.dirty, d.eggselTotals.crack, d.eggselTotals.damage, d.eggselTotals.abnormal, d.eggselTotals.nonhe],
+    ],
+    columnStyles:{ 10:{ textColor:[179,38,30], fontStyle:"bold" } },
+    didParseCell: function(data){
+      if(data.row.index === d.eggsel.length){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [240,239,232]; }
+    },
+  });
+  y = doc.lastAutoTable.finalY + 14;
+
+  if(y > 650){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(43,65,39);
+  doc.text("Male Specialist — Male Replaced", marginL, y);
+  doc.setTextColor(0,0,0);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:8.5, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["Pan","A","B","C"]],
+    body:[[d.msPan,d.msA,d.msB,d.msC]],
+  });
+  y = doc.lastAutoTable.finalY + 14;
+
+  if(y > 650){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(43,65,39);
+  doc.text("Parent Stock Depletion", marginL, y);
+  doc.setTextColor(0,0,0);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:8.5, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["","Female","Male"]],
+    body:[
+      ["Balance b/f", d.psdBalF, d.psdBalM],
+      ["Culling", d.psdCullF, d.psdCullM],
+      ["Death", d.psdDeathF, d.psdDeathM],
+      ["Remaining", d.psdRemF, d.psdRemM],
+    ],
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}},
+    didParseCell: function(data){
+      if(data.row.index === 3 && data.column.index > 0){ data.cell.styles.textColor = [179,38,30]; data.cell.styles.fontStyle = "bold"; }
+    },
+  });
+  y = doc.lastAutoTable.finalY + 14;
+
+  if(d.feedUsage.length){
+    if(y > 650){ doc.addPage(); y = 40; }
+    doc.setFont("helvetica","bold");
+    doc.setTextColor(43,65,39);
+    doc.text("Feed Usage", marginL, y);
+    doc.setTextColor(0,0,0);
+    y += 6;
+    doc.autoTable({
+      startY: y+4,
+      margin:{left:marginL,right:marginL},
+      styles:{ fontSize:8.5, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+      headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+      head:[["Code","Female (kg)","Male (kg)"]],
+      body: d.feedUsage.map(r=>[r.code,r.female,r.male]),
+      columnStyles:{0:{halign:"left",fontStyle:"bold"}},
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  if(y > 620){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","bold");
+  doc.setTextColor(43,65,39);
+  doc.text("Equipment Report", marginL, y);
+  doc.setTextColor(0,0,0);
+  y += 6;
+  doc.autoTable({
+    startY: y+4,
+    margin:{left:marginL,right:marginL},
+    styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["Item","OK / Faulty","Remarks"]],
+    body: d.equip.map(r=>[r.name, r.status, r.remarks]),
+    columnStyles:{0:{halign:"left",fontStyle:"bold"}, 2:{halign:"left"}},
+    didParseCell: function(data){
+      if(data.column.index === 1){
+        data.cell.styles.textColor = data.cell.raw === "Faulty" ? [179,38,30] : [63,93,58];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  if(y > 700){ doc.addPage(); y = 40; }
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9);
+  doc.text(`Temp at 1:30PM — Infront: ${d.eqTempInfront || "___"}°C   Middle: ${d.eqTempMiddle || "___"}°C   Behind: ${d.eqTempBehind || "___"}°C`, marginL, y);
+  y += 14;
+  doc.text(`Feeding Time — From: ${d.eqFeedFrom || "___"}   To: ${d.eqFeedTo || "___"}`, marginL, y);
+  y += 14;
+  doc.text(`Water Meter 4:30PM — Before: ${d.eqWaterBefore || "___"}   After: ${d.eqWaterAfter || "___"}   Consumed: ${d.eqWaterConsumed || "___"}`, marginL, y);
+  y += 20;
+
+  if(d.weightTally.length){
+    if(y > 650){ doc.addPage(); y = 40; }
+    doc.setFont("helvetica","bold");
+    doc.setTextColor(43,65,39);
+    doc.text("Weight Range Tally", marginL, y);
+    doc.setTextColor(0,0,0);
+    y += 6;
+    doc.autoTable({
+      startY: y+4,
+      margin:{left:marginL,right:marginL},
+      styles:{ fontSize:8.5, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.5 },
+      headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+      head:[["Range (g)","Count"]],
+      body: d.weightTally.map(r=>[r.range,r.count]),
+      columnStyles:{0:{halign:"left",fontStyle:"bold"}},
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  if(d.remarks){
+    if(y > 700){ doc.addPage(); y = 40; }
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(43,65,39);
+    doc.text("Remarks:", marginL, y);
+    doc.setFont("helvetica","normal");
+    doc.setTextColor(0,0,0);
+    const lines = doc.splitTextToSize(d.remarks, pageW - marginL*2 - 60);
+    doc.text(lines, marginL + 56, y);
+    y += Math.max(14, lines.length * 11) + 16;
+  }
+
+  if(y > 700){ doc.addPage(); y = 40; }
+
+  const sigW = 90, sigH = 34;
+  if(supervisorSignature){
+    try{ doc.addImage(supervisorSignature, imageFormatFromDataUrl(supervisorSignature), marginL, y, sigW, sigH); }catch(e){}
+  }
+  const lineY = y + sigH + 6;
+  doc.setDrawColor(150,150,140);
+  doc.setLineWidth(0.6);
+  doc.line(marginL, lineY, marginL + sigW, lineY);
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text(`Checked By (Supervisor): ${d.supervisor || "_______________________"}`, marginL, lineY + 12);
+
+  const fileDate = d.date ? d.date.split("-").reverse().join(" ") : "Draft";
+  const fname = `${fileDate} Daily Egg Selection Report.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.querySelectorAll("input").forEach(i=>{ if(i.type !== "file") i.value=""; });
+  document.querySelectorAll("textarea").forEach(t=>t.value="");
+  equipItems.forEach((name,i)=> setEquipOk(i, true));
+  equipAllOk = true;
+  document.getElementById("toggle-equip-btn").textContent = "Toggle All OK / Faulty: OK";
+  supervisorSignature = DEFAULT_SUPERVISOR_SIGNATURE;
+  refreshSignatureImage();
+  formTouched = false;
+}
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+</script>
+</body>
+</html>

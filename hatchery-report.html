@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="passwords.js"></script>
+<script src="auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hatchery Record</title>
@@ -489,6 +491,38 @@ async function cplSyncFlush(){
     cplSyncSetStatus("Synced to the cloud — " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
   }catch(e){ cplSyncSetStatus("Saved on this device — will sync when online"); }
 }
+function cplNormDate(d){
+  d = String(d);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const m = d.match(/^\w{3} (\w{3}) (\d{1,2}) (\d{4})/);
+  if(m){ const mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(m[1]);
+    if(mo >= 0) return m[3] + "-" + String(mo+1).padStart(2,"0") + "-" + String(m[2]).padStart(2,"0"); }
+  return d;
+}
+function cplNormStamp(u){
+  u = String(u||"");
+  if(/^\d{4}-\d{2}-\d{2}T/.test(u)) return u;
+  const t = Date.parse(u); return isNaN(t) ? u : new Date(t).toISOString();
+}
+// The cloud sheet can turn dates into long date text. Read them back as normal dates, using the save time kept inside each record.
+function cplNormItem(it){
+  return { date:cplNormDate(it.date), section:it.section, payload:it.payload,
+           updated:(it.payload && it.payload.updated) ? String(it.payload.updated) : cplNormStamp(it.updated) };
+}
+// Clean up records that were saved under a long date text by an earlier sync.
+function cplDbRepair(db){
+  Object.keys(db.records).forEach(k=>{
+    if(/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+    const nk = cplNormDate(k); if(!/^\d{4}-\d{2}-\d{2}$/.test(nk)) return;
+    const src = db.records[k]; db.records[nk] = db.records[nk] || {};
+    Object.keys(src).forEach(sec=>{
+      const cur = db.records[nk][sec];
+      if(!cur || (src[sec].updated||"") > (cur.updated||"")) db.records[nk][sec] = src[sec];
+    });
+    delete db.records[k];
+  });
+  return db;
+}
 async function cplSyncAll(){
   const c = cplSyncCfg(); if(!c) return null;
   if(!navigator.onLine){ cplSyncSetStatus("Offline — will sync when online"); return null; }
@@ -497,8 +531,8 @@ async function cplSyncAll(){
     const r = await fetch(c.url + (c.url.indexOf("?")>=0 ? "&" : "?") + "key=" + encodeURIComponent(c.key));
     const j = await r.json();
     if(j.error) throw new Error(j.error);
-    const db = cplDbLoad(), remote = {}; let pulled = 0;
-    (j.items||[]).forEach(it=>{
+    const db = cplDbRepair(cplDbLoad()), remote = {}; let pulled = 0;
+    (j.items||[]).map(cplNormItem).forEach(it=>{
       remote[it.date+"|"+it.section] = it.updated || "";
       const cur = db.records[it.date] && db.records[it.date][it.section];
       if(!cur || (it.updated||"") > (cur.updated||"")){

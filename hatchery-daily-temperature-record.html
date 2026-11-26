@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="passwords.js"></script>
+<script src="auth.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hatchery Daily Temperature Record</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2a1f;
+    --paper:#f7f5ef;
+    --green:#3f5d3a;
+    --green-dark:#2b4127;
+    --amber:#c98a2c;
+    --line:#d8d3c4;
+    --card:#ffffff;
+    --red:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:100px;
+  }
+  header{
+    background:var(--green-dark);
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:3px solid var(--amber);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header h1{ margin:0; font-size:16px; font-weight:700; letter-spacing:.3px; }
+  header p{ margin:4px 0 0; font-size:12.5px; opacity:.85; letter-spacing:.2px; }
+  .wrap{max-width:1100px;margin:0 auto;padding:14px;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,65,39,0.06);
+  }
+  .card h2{
+    font-size:13px;
+    margin:0 0 10px;
+    color:#fff;
+    background:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    padding:8px 10px;
+    border-radius:6px;
+    border-left:4px solid var(--amber);
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .field{flex:1;min-width:140px;}
+  label{ display:block; font-size:10.5px; color:#5a5a4f; margin-bottom:3px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input, select{
+    width:100%;
+    padding:8px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13.5px;
+    background:#fff;
+    color:var(--ink);
+    font-weight:600;
+  }
+  input[readonly]{ background:#f0efe8; color:var(--green-dark); }
+  input:focus, select:focus{ outline:2px solid var(--green); outline-offset:1px; }
+
+  table.grid{
+    width:100%;
+    border-collapse:collapse;
+    font-size:11.5px;
+  }
+  table.grid th{
+    background:var(--green-dark);
+    color:#fff;
+    padding:7px 5px;
+    font-size:10px;
+    font-weight:700;
+    text-align:center;
+    border:1px solid var(--green-dark);
+    border-bottom:2px solid var(--amber);
+    white-space:nowrap;
+  }
+  table.grid td{
+    border:1px solid var(--line);
+    padding:4px;
+    text-align:center;
+  }
+  table.grid td.date-cell{
+    font-weight:700;
+    color:var(--green-dark);
+    background:#f7f5ef;
+    white-space:nowrap;
+  }
+  table.grid input{
+    padding:5px 3px;
+    font-size:11.5px;
+    text-align:center;
+    min-width:56px;
+  }
+  td.auto-cell input{
+    background:#fbeceb;
+    color:var(--red);
+    font-weight:800;
+  }
+  table.grid input[type="checkbox"]{
+    width:18px;
+    height:18px;
+    cursor:pointer;
+  }
+  .scroll-x{ overflow-x:auto; }
+  .scroll-y{ max-height:60vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; }
+  .hint{ font-size:11px; color:#7a7a6d; margin-top:6px; }
+
+  .summary-box{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 0;
+    font-size:13px;
+    font-weight:700;
+    border-bottom:1px solid var(--line);
+  }
+  .summary-box:last-child{ border-bottom:none; }
+  .summary-box .value{ color:var(--red); font-size:16px; }
+
+  .sig-box{
+    margin-top:8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    min-height:64px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:6px;
+  }
+  .sig-box img{
+    max-width:100%;
+    max-height:60px;
+    display:none;
+  }
+  .sig-box img[src]:not([src=""]){ display:block; }
+  .sig-controls{
+    display:flex;
+    gap:8px;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+  .sig-upload-btn, .sig-draw-btn{
+    flex:1;
+    min-width:100px;
+    text-align:center;
+    background:var(--green-dark);
+    color:#fff;
+    border:none;
+    padding:7px 8px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .sig-draw-btn{ background:var(--amber); }
+  .sig-clear-btn{
+    background:none;
+    border:1px solid var(--red);
+    color:var(--red);
+    padding:7px 10px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+  }
+  .sigpad-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+  }
+  .sigpad-overlay.open{ display:flex; }
+  .sigpad-box{
+    background:#fff;
+    border-radius:10px;
+    padding:14px;
+    width:100%;
+    max-width:420px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.3);
+  }
+  .sigpad-box h3{
+    margin:0 0 10px;
+    font-size:13px;
+    color:var(--green-dark);
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+  .sigpad-canvas-wrap{
+    border:2px dashed var(--line);
+    border-radius:8px;
+    background:#fff;
+    touch-action:none;
+  }
+  #sigpad-canvas{
+    width:100%;
+    height:180px;
+    display:block;
+    background:#fff;
+    border-radius:6px;
+  }
+  .sigpad-hint{ font-size:11px; color:#7a7a6d; margin:8px 0; }
+  .sigpad-actions{ display:flex; gap:8px; margin-top:6px; }
+  .sigpad-actions button{ flex:1; padding:10px; border-radius:8px; border:none; font-size:13px; font-weight:700; }
+  .sigpad-save{ background:var(--amber); color:#fff; }
+  .sigpad-clear{ background:var(--green-dark); color:#fff; }
+  .sigpad-cancel{ background:none; border:1px solid var(--line); color:var(--ink); }
+
+  footer.bar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    padding:10px 14px;
+    display:flex;
+    gap:10px;
+    z-index:20;
+  }
+  .btn{ flex:1; padding:13px; border-radius:8px; border:none; font-size:14.5px; font-weight:700; }
+  .btn-primary{ background:var(--amber); color:#fff; }
+  .btn-secondary{ background:var(--green-dark); color:#fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hatchery Daily Temperature Record</h1>
+  <p>CPL Coconut Products Limited — Poultry Division — Hatchery</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Record Details</h2>
+    <div class="row">
+      <div class="field"><label>Month / Year</label><input type="month" id="f-monthyear"></div>
+      <div class="field"><label>Room / Area</label><input type="text" id="f-room" placeholder="e.g. Setter Room 1"></div>
+      <div class="field"><label>Thermometer No.</label><input type="text" id="f-thermno"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Target Min (°C)</label><input type="number" step="0.1" id="f-targetmin" oninput="recalcSummary()"></div>
+      <div class="field"><label>Target Max (°C)</label><input type="number" step="0.1" id="f-targetmax" oninput="recalcSummary()"></div>
+      <div class="field"><label>Read Time (daily)</label><input type="time" id="f-readtime"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Daily Readings</h2>
+    <div class="scroll-y">
+      <div class="scroll-x">
+        <table class="grid" id="temp-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Highest (°C)</th>
+              <th>Lowest (°C)</th>
+              <th>Swing</th>
+              <th>Average</th>
+              <th>Reset Done</th>
+              <th>Read By</th>
+              <th>Remarks / Action Taken</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="hint">Swing = Highest − Lowest. Average = (Highest + Lowest) ÷ 2. Both fill in automatically as you type.</p>
+  </div>
+
+  <div class="card">
+    <h2>Summary for the Month</h2>
+    <div class="summary-box">
+      <span>Highest of Month</span>
+      <span class="value" id="summary-highest">—</span>
+    </div>
+    <div class="summary-box">
+      <span>Lowest of Month</span>
+      <span class="value" id="summary-lowest">—</span>
+    </div>
+    <div class="summary-box">
+      <span>Biggest Swing</span>
+      <span class="value" id="summary-swing">—</span>
+    </div>
+    <div class="summary-box">
+      <span>Days Outside Target</span>
+      <span class="value" id="summary-outside">0</span>
+    </div>
+    <p class="hint">All four update automatically from the daily readings and the Target Min/Max above.</p>
+  </div>
+
+  <div class="card">
+    <h2>Checked By</h2>
+    <div class="row">
+      <div class="field"><label>Supervisor</label><input type="text" id="f-supervisor" placeholder="e.g. Robert Wartovo"></div>
+      <div class="field"><label>Date</label><input type="date" id="f-checkdate"></div>
+    </div>
+    <label>Signature</label>
+    <div class="sig-box" id="sig-supervisor-box">
+      <img id="sig-supervisor-img" alt="Supervisor Signature">
+    </div>
+    <div class="sig-controls">
+      <label class="sig-upload-btn">
+        Upload Signature
+        <input type="file" accept="image/*" style="display:none;" onchange="handleSignatureUpload(event)">
+      </label>
+      <button type="button" class="sig-draw-btn" onclick="openSignaturePad()">Draw Signature</button>
+      <button type="button" class="sig-clear-btn" onclick="clearSignature()">Clear</button>
+    </div>
+  </div>
+
+</div>
+
+<footer class="bar">
+  <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+  <button class="btn btn-primary" onclick="generatePDF()">Generate PDF</button>
+</footer>
+
+<div class="sigpad-overlay" id="sigpad-overlay">
+  <div class="sigpad-box">
+    <h3>Draw Your Signature</h3>
+    <div class="sigpad-canvas-wrap">
+      <canvas id="sigpad-canvas"></canvas>
+    </div>
+    <p class="sigpad-hint">Use your finger or mouse to draw. Tap Save when you're happy with it.</p>
+    <div class="sigpad-actions">
+      <button type="button" class="sigpad-cancel" onclick="closeSignaturePad()">Cancel</button>
+      <button type="button" class="sigpad-clear" onclick="clearSignaturePad()">Clear</button>
+      <button type="button" class="sigpad-save" onclick="saveSignaturePad()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = 31;
+let supervisorSignature = "";
+
+function buildTable(){
+  const tbody = document.querySelector("#temp-table tbody");
+  for(let d=1; d<=DAYS; d++){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="date-cell">${d}</td>
+      <td><input type="time" data-day="${d}" data-k="time"></td>
+      <td><input type="number" step="0.1" data-day="${d}" data-k="high" oninput="updateRow(${d})"></td>
+      <td><input type="number" step="0.1" data-day="${d}" data-k="low" oninput="updateRow(${d})"></td>
+      <td class="auto-cell"><input type="text" data-day="${d}" data-k="swing" readonly></td>
+      <td class="auto-cell"><input type="text" data-day="${d}" data-k="avg" readonly></td>
+      <td><input type="checkbox" data-day="${d}" data-k="reset"></td>
+      <td><input type="text" data-day="${d}" data-k="readby" style="min-width:50px;"></td>
+      <td><input type="text" data-day="${d}" data-k="remarks" style="min-width:110px;"></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+buildTable();
+
+function val(d,k){
+  const el = document.querySelector(`[data-day="${d}"][data-k="${k}"]`);
+  return el ? el.value : "";
+}
+
+function updateRow(d){
+  const high = parseFloat(val(d,"high"));
+  const low = parseFloat(val(d,"low"));
+  const swingEl = document.querySelector(`[data-day="${d}"][data-k="swing"]`);
+  const avgEl = document.querySelector(`[data-day="${d}"][data-k="avg"]`);
+  if(!isNaN(high) && !isNaN(low)){
+    swingEl.value = (high - low).toFixed(1);
+    avgEl.value = ((high + low) / 2).toFixed(1);
+  } else {
+    swingEl.value = "";
+    avgEl.value = "";
+  }
+  recalcSummary();
+}
+
+function recalcSummary(){
+  const targetMin = parseFloat(document.getElementById("f-targetmin").value);
+  const targetMax = parseFloat(document.getElementById("f-targetmax").value);
+  let highs = [], lows = [], swings = [], outsideCount = 0;
+
+  for(let d=1; d<=DAYS; d++){
+    const high = parseFloat(val(d,"high"));
+    const low = parseFloat(val(d,"low"));
+    const swing = parseFloat(val(d,"swing"));
+    if(!isNaN(high)) highs.push(high);
+    if(!isNaN(low)) lows.push(low);
+    if(!isNaN(swing)) swings.push(swing);
+
+    if(!isNaN(targetMin) && !isNaN(targetMax)){
+      if((!isNaN(high) && high > targetMax) || (!isNaN(low) && low < targetMin)){
+        outsideCount++;
+      }
+    }
+  }
+
+  document.getElementById("summary-highest").textContent = highs.length ? `${Math.max(...highs).toFixed(1)}°C` : "—";
+  document.getElementById("summary-lowest").textContent = lows.length ? `${Math.min(...lows).toFixed(1)}°C` : "—";
+  document.getElementById("summary-swing").textContent = swings.length ? `${Math.max(...swings).toFixed(1)}°C` : "—";
+  document.getElementById("summary-outside").textContent = outsideCount;
+}
+
+// ---- Signature handling ----
+function refreshSignatureImage(){
+  const img = document.getElementById("sig-supervisor-img");
+  if(img) img.src = supervisorSignature || "";
+}
+
+function handleSignatureUpload(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    supervisorSignature = e.target.result;
+    refreshSignatureImage();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSignature(){
+  supervisorSignature = "";
+  refreshSignatureImage();
+}
+
+let sigPadDrawing = false;
+let sigPadHasStrokes = false;
+let sigPadCtx = null;
+
+function openSignaturePad(){
+  sigPadHasStrokes = false;
+  document.getElementById("sigpad-overlay").classList.add("open");
+  setupSignaturePadCanvas();
+}
+function closeSignaturePad(){
+  document.getElementById("sigpad-overlay").classList.remove("open");
+}
+function setupSignaturePadCanvas(){
+  const canvas = document.getElementById("sigpad-canvas");
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(2, 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1a1a1a";
+  sigPadCtx = ctx;
+
+  function getPos(e){
+    const r = canvas.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    return { x: point.clientX - r.left, y: point.clientY - r.top };
+  }
+  function start(e){ e.preventDefault(); sigPadDrawing = true; sigPadHasStrokes = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+  function move(e){ if(!sigPadDrawing) return; e.preventDefault(); const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  function end(){ sigPadDrawing = false; }
+
+  canvas.onmousedown = start;
+  canvas.onmousemove = move;
+  window.onmouseup = end;
+  canvas.ontouchstart = start;
+  canvas.ontouchmove = move;
+  canvas.ontouchend = end;
+}
+function clearSignaturePad(){
+  if(!sigPadCtx) return;
+  const canvas = document.getElementById("sigpad-canvas");
+  const rect = canvas.getBoundingClientRect();
+  sigPadCtx.fillStyle = "#ffffff";
+  sigPadCtx.fillRect(0, 0, rect.width, rect.height);
+  sigPadHasStrokes = false;
+}
+function saveSignaturePad(){
+  if(!sigPadHasStrokes){
+    alert("Draw a signature first, or tap Cancel.");
+    return;
+  }
+  const canvas = document.getElementById("sigpad-canvas");
+  supervisorSignature = canvas.toDataURL("image/png");
+  refreshSignatureImage();
+  closeSignaturePad();
+}
+
+function fmtMonthYear(my){
+  if(!my) return "";
+  const [y,m] = my.split("-");
+  const names = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${names[parseInt(m,10)-1]} ${y}`;
+}
+function fmtDate(d){
+  if(!d) return "";
+  const [y,m,day] = d.split("-");
+  return `${day}/${m}/${y.slice(2)}`;
+}
+
+function collectRows(){
+  const rows = [];
+  for(let d=1; d<=DAYS; d++){
+    const time = val(d,"time");
+    const high = val(d,"high");
+    const low = val(d,"low");
+    const swing = val(d,"swing");
+    const avg = val(d,"avg");
+    const reset = document.querySelector(`[data-day="${d}"][data-k="reset"]`).checked ? "Yes" : "";
+    const readby = val(d,"readby");
+    const remarks = val(d,"remarks");
+    if(!time && !high && !low && !readby && !remarks && !reset) continue;
+    rows.push([d, time, high, low, swing, avg, reset, readby, remarks]);
+  }
+  return rows;
+}
+
+function imageFormatFromDataUrl(dataUrl){
+  if(!dataUrl) return "JPEG";
+  if(dataUrl.indexOf("image/png") !== -1) return "PNG";
+  if(dataUrl.indexOf("image/webp") !== -1) return "WEBP";
+  return "JPEG";
+}
+
+function generatePDF(){
+  const monthYear = document.getElementById("f-monthyear").value;
+  const room = document.getElementById("f-room").value;
+  const thermNo = document.getElementById("f-thermno").value;
+  const targetMin = document.getElementById("f-targetmin").value;
+  const targetMax = document.getElementById("f-targetmax").value;
+  const readTime = document.getElementById("f-readtime").value;
+  const supervisor = document.getElementById("f-supervisor").value;
+  const checkDate = document.getElementById("f-checkdate").value;
+
+  const rows = collectRows();
+  const highest = document.getElementById("summary-highest").textContent;
+  const lowest = document.getElementById("summary-lowest").textContent;
+  const swing = document.getElementById("summary-swing").textContent;
+  const outside = document.getElementById("summary-outside").textContent;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"a4", orientation:"landscape" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginL = 30;
+  const marginR = 30;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(13);
+  doc.setTextColor(43,65,39);
+  doc.text("CPL COCONUT PRODUCTS LIMITED — POULTRY DIVISION — HATCHERY", pageW/2, 22, {align:"center"});
+  doc.setFontSize(11.5);
+  doc.text("DAILY TEMPERATURE RECORD", pageW/2, 37, {align:"center"});
+  doc.setDrawColor(201,138,44);
+  doc.setLineWidth(1.5);
+  doc.line(marginL, 44, pageW - marginR, 44);
+  doc.setTextColor(0,0,0);
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9);
+  doc.text(`Month/Year: ${fmtMonthYear(monthYear) || "_______________"}`, marginL, 58);
+  doc.text(`Room/Area: ${room || "_______________"}`, marginL + 180, 58);
+  doc.text(`Thermometer No.: ${thermNo || "_______________"}`, marginL + 360, 58);
+  doc.text(`Target Min: ${targetMin || "—"}°C`, marginL, 71);
+  doc.text(`Target Max: ${targetMax || "—"}°C`, marginL + 180, 71);
+  doc.text(`Read Time (daily): ${readTime || "_______________"}`, marginL + 360, 71);
+
+  doc.autoTable({
+    startY: 80,
+    margin:{left:marginL,right:marginR},
+    styles:{ fontSize:8, cellPadding:3, halign:"center", lineColor:[180,180,170], lineWidth:0.4 },
+    headStyles:{ fillColor:[47,72,45], textColor:[255,255,255], fontStyle:"bold" },
+    head:[["Date","Time","Highest (°C)","Lowest (°C)","Swing","Average","Reset Done","Read By","Remarks / Action Taken"]],
+    body: rows.length ? rows : [["—","—","—","—","—","—","—","—","—"]],
+    columnStyles:{
+      4:{ textColor:[179,38,30], fontStyle:"bold" },
+      5:{ textColor:[179,38,30], fontStyle:"bold" },
+      8:{ halign:"left" },
+    },
+  });
+
+  let y = doc.lastAutoTable.finalY + 18;
+  if(y > pageH - 120){ doc.addPage(); y = 40; }
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(10.5);
+  doc.setTextColor(43,65,39);
+  doc.text("SUMMARY FOR THE MONTH", marginL, y);
+  doc.setTextColor(0,0,0);
+  y += 16;
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(179,38,30);
+  doc.text(`Highest of Month: ${highest}`, marginL, y);
+  doc.text(`Lowest of Month: ${lowest}`, marginL + 180, y);
+  doc.text(`Biggest Swing: ${swing}`, marginL + 360, y);
+  doc.text(`Days Outside Target: ${outside}`, marginL + 540, y);
+  doc.setTextColor(0,0,0);
+  y += 26;
+
+  if(y + 50 > pageH - 20){ doc.addPage(); y = 40; }
+
+  const sigW = 90, sigH = 34;
+  if(supervisorSignature){
+    try{ doc.addImage(supervisorSignature, imageFormatFromDataUrl(supervisorSignature), marginL, y, sigW, sigH); }catch(e){}
+  }
+  const lineY = y + sigH + 6;
+  doc.setDrawColor(150,150,140);
+  doc.setLineWidth(0.6);
+  doc.line(marginL, lineY, marginL + sigW, lineY);
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(9.5);
+  doc.text("Signature", marginL, lineY + 12);
+  doc.text(`Checked By (Supervisor): ${supervisor || "_______________________"}`, marginL + 160, lineY + 12);
+  doc.text(`Date: ${fmtDate(checkDate) || "_______________________"}`, marginL + 420, lineY + 12);
+
+  const monthLabel = fmtMonthYear(monthYear).replace(/\s+/g," ").trim() || "Draft";
+  const fname = `${monthLabel} ${room || "Hatchery"} Daily Temperature Record.pdf`;
+  doc.save(fname);
+}
+
+function clearForm(){
+  if(!confirm("Clear all entered data?")) return;
+  document.querySelectorAll("#temp-table input[type='text'], #temp-table input[type='number'], #temp-table input[type='time']").forEach(i=>{ i.value = ""; });
+  document.querySelectorAll("#temp-table input[type='checkbox']").forEach(c=>{ c.checked = false; });
+  document.getElementById("f-monthyear").value = "";
+  document.getElementById("f-room").value = "";
+  document.getElementById("f-thermno").value = "";
+  document.getElementById("f-targetmin").value = "";
+  document.getElementById("f-targetmax").value = "";
+  document.getElementById("f-readtime").value = "";
+  document.getElementById("f-supervisor").value = "";
+  document.getElementById("f-checkdate").value = "";
+  supervisorSignature = "";
+  refreshSignatureImage();
+  recalcSummary();
+  formTouched = false;
+}
+
+// Warn before an accidental refresh, back button, or tab close wipes anything typed in.
+// This can't bring data back after a refresh actually happens — it just gives a chance to cancel first.
+let formTouched = false;
+document.addEventListener("input", ()=>{ formTouched = true; });
+document.addEventListener("change", ()=>{ formTouched = true; });
+window.addEventListener("beforeunload", (e)=>{
+  if(!formTouched) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+</script>
+</body>
+</html>
